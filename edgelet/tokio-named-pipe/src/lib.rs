@@ -3,10 +3,9 @@
 #![deny(warnings)]
 #![cfg(windows)]
 
-extern crate bytes;
 extern crate futures;
 extern crate mio_named_pipes;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_io;
 extern crate winapi;
 
@@ -18,10 +17,9 @@ use std::os::windows::prelude::*;
 use std::path::Path;
 use std::time::Duration;
 
-use bytes::{Buf, BufMut};
-use futures::{Async, Poll};
+use futures::Poll;
 use mio_named_pipes::NamedPipe;
-use tokio_core::reactor::{Handle, PollEvented};
+use tokio::reactor::PollEvented2;
 use tokio_io::{AsyncRead, AsyncWrite};
 use winapi::um::namedpipeapi::WaitNamedPipeW;
 use winapi::um::winbase::*;
@@ -31,13 +29,12 @@ const PIPE_WAIT_TIMEOUT_MS: u32 = 10 * 1000;
 
 #[derive(Debug)]
 pub struct PipeStream {
-    io: PollEvented<NamedPipe>,
+    io: PollEvented2<NamedPipe>,
 }
 
 impl PipeStream {
     pub fn connect<P: AsRef<Path>>(
         path: P,
-        handle: &Handle,
         timeout: Option<Duration>,
     ) -> io::Result<PipeStream> {
         let timeout = timeout
@@ -69,7 +66,6 @@ impl PipeStream {
                         }
                         return PipeStream::connect(
                             path,
-                            handle,
                             Some(Duration::from_millis(u64::from(timeout))),
                         );
                     }
@@ -81,25 +77,17 @@ impl PipeStream {
                 let named_pipe = unsafe { NamedPipe::from_raw_handle(file.into_raw_handle()) };
 
                 Ok(PipeStream {
-                    io: PollEvented::new(named_pipe, handle)?,
+                    io: PollEvented2::new(named_pipe),
                 })
             }
         }
-    }
-
-    pub fn poll_read(&self) -> Async<()> {
-        self.io.poll_read()
-    }
-
-    pub fn poll_write(&self) -> Async<()> {
-        self.io.poll_write()
     }
 
     pub fn disconnect(&self) -> io::Result<()> {
         self.io.get_ref().disconnect()
     }
 
-    pub fn io_mut(&mut self) -> &mut PollEvented<NamedPipe> {
+    pub fn io_mut(&mut self) -> &mut PollEvented2<NamedPipe> {
         &mut self.io
     }
 }
@@ -140,54 +128,10 @@ impl AsyncRead for PipeStream {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
         false
     }
-
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <PipeStream>::poll_read(self) {
-            return Ok(Async::NotReady);
-        }
-
-        unsafe {
-            match self.io_mut().get_mut().read(buf.bytes_mut()) {
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        self.io.need_read();
-                        Ok(Async::NotReady)
-                    } else {
-                        Err(e)
-                    }
-                }
-                Ok(size) => {
-                    buf.advance_mut(size);
-                    Ok(size.into())
-                }
-            }
-        }
-    }
 }
 
 impl AsyncWrite for PipeStream {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         Ok(().into())
-    }
-
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = <PipeStream>::poll_write(self) {
-            return Ok(Async::NotReady);
-        }
-
-        match self.io_mut().get_mut().write(buf.bytes()) {
-            Err(e) => {
-                if e.kind() == io::ErrorKind::WouldBlock {
-                    self.io.need_write();
-                    Ok(Async::NotReady)
-                } else {
-                    Err(e)
-                }
-            }
-            Ok(size) => {
-                buf.advance(size);
-                Ok(size.into())
-            }
-        }
     }
 }

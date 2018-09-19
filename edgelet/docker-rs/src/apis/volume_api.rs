@@ -10,30 +10,29 @@
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use futures;
 use futures::{Future, Stream};
 use hyper;
 use serde_json;
+use typed_headers::{self, http, mime, HeaderMapExt};
 
-use hyper::header::UserAgent;
+use super::{configuration, Error, super::utils::UserAgent};
 
-use super::{configuration, Error};
-
-pub struct VolumeApiClient<C: hyper::client::Connect> {
-    configuration: Rc<configuration::Configuration<C>>,
+pub struct VolumeApiClient<C: hyper::client::connect::Connect> {
+    configuration: Arc<configuration::Configuration<C>>,
 }
 
-impl<C: hyper::client::Connect> VolumeApiClient<C> {
-    pub fn new(configuration: Rc<configuration::Configuration<C>>) -> VolumeApiClient<C> {
+impl<C: hyper::client::connect::Connect> VolumeApiClient<C> {
+    pub fn new(configuration: Arc<configuration::Configuration<C>>) -> VolumeApiClient<C> {
         VolumeApiClient {
             configuration: configuration,
         }
     }
 }
 
-pub trait VolumeApi {
+pub trait VolumeApi: Send + Sync {
     fn volume_create(
         &self,
         volume_config: ::models::VolumeConfig,
@@ -57,14 +56,18 @@ pub trait VolumeApi {
     ) -> Box<Future<Item = ::models::InlineResponse20016, Error = Error<serde_json::Value>>>;
 }
 
-impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
+impl<C> VolumeApi for VolumeApiClient<C> where
+    C: hyper::client::connect::Connect + 'static,
+    <C as hyper::client::connect::Connect>::Transport: 'static,
+    <C as hyper::client::connect::Connect>::Future: 'static,
+{
     fn volume_create(
         &self,
         volume_config: ::models::VolumeConfig,
     ) -> Box<Future<Item = ::models::Volume, Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Post;
+        let method = hyper::Method::POST;
 
         let uri_str = format!("/volumes/create");
 
@@ -73,18 +76,21 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let serialized = serde_json::to_string(&volume_config).unwrap();
+        let serialized_len = serialized.len();
+
+        let mut req = hyper::Request::new(hyper::Body::from(serialized));
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
-        let serialized = serde_json::to_string(&volume_config).unwrap();
-        req.headers_mut().set(hyper::header::ContentType::json());
+        req.headers_mut().typed_insert(&typed_headers::ContentType(mime::APPLICATION_JSON));
         req.headers_mut()
-            .set(hyper::header::ContentLength(serialized.len() as u64));
-        req.set_body(serialized);
+            .typed_insert(&typed_headers::ContentLength(serialized_len as u64));
 
         // send request
         Box::new(
@@ -93,8 +99,8 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
                 .request(req)
                 .map_err(|e| Error::from(e))
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(|e| Error::from(e))
@@ -118,7 +124,7 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
     ) -> Box<Future<Item = (), Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Delete;
+        let method = hyper::Method::DELETE;
 
         let query = ::url::form_urlencoded::Serializer::new(String::new())
             .append_pair("force", &force.to_string())
@@ -130,11 +136,13 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let mut req = hyper::Request::new(hyper::Body::empty());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
         // send request
@@ -144,8 +152,8 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
                 .request(req)
                 .map_err(|e| Error::from(e))
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(|e| Error::from(e))
@@ -165,7 +173,7 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
     ) -> Box<Future<Item = ::models::Volume, Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Get;
+        let method = hyper::Method::GET;
 
         let uri_str = format!("/volumes/{name}", name = name);
 
@@ -174,11 +182,13 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let mut req = hyper::Request::new(hyper::Body::empty());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
         // send request
@@ -188,8 +198,8 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
                 .request(req)
                 .map_err(|e| Error::from(e))
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(|e| Error::from(e))
@@ -212,7 +222,7 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
     ) -> Box<Future<Item = ::models::InlineResponse20015, Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Get;
+        let method = hyper::Method::GET;
 
         let query = ::url::form_urlencoded::Serializer::new(String::new())
             .append_pair("filters", &filters.to_string())
@@ -224,11 +234,13 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let mut req = hyper::Request::new(hyper::Body::empty());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
         // send request
@@ -238,8 +250,8 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
                 .request(req)
                 .map_err(|e| Error::from(e))
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(|e| Error::from(e))
@@ -263,7 +275,7 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
     ) -> Box<Future<Item = ::models::InlineResponse20016, Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Post;
+        let method = hyper::Method::POST;
 
         let query = ::url::form_urlencoded::Serializer::new(String::new())
             .append_pair("filters", &filters.to_string())
@@ -275,11 +287,13 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let mut req = hyper::Request::new(hyper::Body::empty());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
         // send request
@@ -289,8 +303,8 @@ impl<C: hyper::client::Connect> VolumeApi for VolumeApiClient<C> {
                 .request(req)
                 .map_err(|e| Error::from(e))
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(|e| Error::from(e))

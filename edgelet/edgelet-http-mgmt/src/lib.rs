@@ -29,7 +29,6 @@ extern crate serde;
 extern crate serde_json;
 #[cfg(not(test))]
 extern crate serde_json;
-extern crate tokio_core;
 extern crate url;
 
 use http::Response;

@@ -10,44 +10,47 @@
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use futures;
 use futures::{Future, Stream};
 use hyper;
 use serde_json;
-
-use hyper::header::{Authorization, UserAgent};
+use typed_headers::{self, http, mime, HeaderMapExt};
 
 use super::{configuration, Error};
 
-pub struct SystemInformationApiClient<C: hyper::client::Connect> {
-    configuration: Rc<configuration::Configuration<C>>,
+pub struct SystemInformationApiClient<C: hyper::client::connect::Connect> {
+    configuration: Arc<configuration::Configuration<C>>,
 }
 
-impl<C: hyper::client::Connect> SystemInformationApiClient<C> {
+impl<C: hyper::client::connect::Connect> SystemInformationApiClient<C> {
     pub fn new(
-        configuration: Rc<configuration::Configuration<C>>,
+        configuration: Arc<configuration::Configuration<C>>,
     ) -> SystemInformationApiClient<C> {
         SystemInformationApiClient { configuration }
     }
 }
 
-pub trait SystemInformationApi {
+pub trait SystemInformationApi: Send + Sync {
     fn get_system_info(
         &self,
         api_version: &str,
     ) -> Box<Future<Item = ::models::SystemInfo, Error = Error<serde_json::Value>>>;
 }
 
-impl<C: hyper::client::Connect> SystemInformationApi for SystemInformationApiClient<C> {
+impl<C> SystemInformationApi for SystemInformationApiClient<C> where
+    C: hyper::client::connect::Connect + 'static,
+    <C as hyper::client::connect::Connect>::Transport: 'static,
+    <C as hyper::client::connect::Connect>::Future: 'static,
+{
     fn get_system_info(
         &self,
         api_version: &str,
     ) -> Box<Future<Item = ::models::SystemInfo, Error = Error<serde_json::Value>>> {
         let configuration: &configuration::Configuration<C> = self.configuration.borrow();
 
-        let method = hyper::Method::Get;
+        let method = hyper::Method::GET;
 
         let query = ::url::form_urlencoded::Serializer::new(String::new())
             .append_pair("api-version", &api_version.to_string())
@@ -59,11 +62,13 @@ impl<C: hyper::client::Connect> SystemInformationApi for SystemInformationApiCli
         // if let Err(e) = uri {
         //     return Box::new(futures::future::err(e));
         // }
-        let mut req = hyper::Request::new(method, uri.unwrap());
+        let mut req = hyper::Request::new(hyper::Body::empty());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri.unwrap();
 
         if let Some(ref user_agent) = configuration.user_agent {
             req.headers_mut()
-                .set(UserAgent::new(Cow::Owned(user_agent.clone())));
+                .append(http::header::USER_AGENT, user_agent.parse().unwrap());
         }
 
         // send request
@@ -73,8 +78,8 @@ impl<C: hyper::client::Connect> SystemInformationApi for SystemInformationApiCli
                 .request(req)
                 .map_err(Error::from)
                 .and_then(|resp| {
-                    let status = resp.status();
-                    resp.body()
+                    let (http::response::Parts { status, .. }, body) = resp.into_parts();
+                    body
                         .concat2()
                         .and_then(move |body| Ok((status, body)))
                         .map_err(Error::from)

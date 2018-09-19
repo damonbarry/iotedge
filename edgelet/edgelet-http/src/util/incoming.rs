@@ -2,8 +2,8 @@
 
 use std::io;
 
-use futures::{Async, Poll, Stream};
-use tokio_core::net::TcpListener;
+use futures::{Poll, Stream};
+use tokio_tcp::TcpListener;
 #[cfg(unix)]
 use tokio_uds::UnixListener;
 
@@ -20,22 +20,20 @@ impl Stream for Incoming {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match *self {
+        Ok(match *self {
             Incoming::Tcp(ref mut listener) => {
-                let (stream, addr) = try_nb!(listener.accept());
-                Ok(Async::Ready(Some((
+                try_nb!(listener.poll_accept()).map(|(stream, addr)| Some((
                     StreamSelector::Tcp(stream),
                     IncomingSocketAddr::Tcp(addr),
-                ))))
+                )))
             }
             #[cfg(unix)]
             Incoming::Unix(ref mut listener) => {
-                let (stream, addr) = try_nb!(listener.accept());
-                Ok(Async::Ready(Some((
+                try_nb!(listener.poll_accept()).map(|(stream, addr)| Some((
                     StreamSelector::Unix(stream),
                     IncomingSocketAddr::Unix(addr),
-                ))))
+                )))
             }
-        }
+        })
     }
 }

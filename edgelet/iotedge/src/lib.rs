@@ -33,7 +33,7 @@ pub use unknown::Unknown;
 pub use version::Version;
 
 pub trait Command {
-    type Future: Future<Item = (), Error = Error>;
+    type Future: Future<Item = (), Error = Error> + Send;
 
     fn execute(&mut self) -> Self::Future;
 }

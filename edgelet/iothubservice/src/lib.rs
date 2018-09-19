@@ -13,7 +13,9 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 #[cfg(test)]
-extern crate tokio_core;
+extern crate tokio;
+#[cfg(test)]
+extern crate typed_headers;
 extern crate url;
 
 extern crate edgelet_core;

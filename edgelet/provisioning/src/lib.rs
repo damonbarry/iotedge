@@ -19,7 +19,7 @@ extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
 #[cfg(test)]
-extern crate tokio_core;
+extern crate tokio;
 extern crate url;
 
 extern crate dps;

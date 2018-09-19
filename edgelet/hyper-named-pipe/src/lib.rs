@@ -12,7 +12,6 @@ extern crate edgelet_utils;
 extern crate futures;
 extern crate hex;
 extern crate hyper;
-extern crate tokio_core;
 extern crate tokio_named_pipe;
 extern crate tokio_service;
 extern crate url;
@@ -24,9 +23,7 @@ use std::io;
 
 use futures::future::FutureResult;
 use futures::IntoFuture;
-use hyper::Uri as HyperUri;
-use tokio_core::reactor::Handle;
-use tokio_service::Service;
+use hyper::{client::connect::{Connect, Connected, Destination}};
 
 use tokio_named_pipe::PipeStream;
 
@@ -35,25 +32,20 @@ pub use uri::Uri;
 
 pub const NAMED_PIPE_SCHEME: &str = "npipe";
 
-pub struct PipeConnector(Handle);
+pub struct PipeConnector;
 
-impl PipeConnector {
-    pub fn new(handle: Handle) -> Self {
-        PipeConnector(handle)
-    }
-}
-
-impl Service for PipeConnector {
-    type Request = HyperUri;
-    type Response = PipeStream;
+impl Connect for PipeConnector {
+    type Transport = PipeStream;
     type Error = io::Error;
-    type Future = FutureResult<PipeStream, io::Error>;
+    type Future = FutureResult<(Self::Transport, Connected), Self::Error>;
 
-    fn call(&self, uri: HyperUri) -> Self::Future {
-        Uri::get_pipe_path(&uri)
+    fn connect(&self, dst: Destination) -> Self::Future {
+        Uri::get_pipe_path(&dst)
             .map_err(|_err| {
-                io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid uri {}", uri))
-            }).and_then(|path| PipeStream::connect(path, &self.0, None))
+                io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid destination {:?}", dst))
+            })
+            .and_then(|path| PipeStream::connect(path, None))
+            .map(|stream| (stream, Connected::new()))
             .into_future()
     }
 }

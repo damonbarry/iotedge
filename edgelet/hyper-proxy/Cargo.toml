@@ -1,0 +1,15 @@
+[package]
+name = "hyper-proxy"
+version = "0.1.0"
+authors = ["Azure IoT Edge Devs"]
+publish = false
+
+[dependencies]
+bytes = "0.4"
+futures = "0.1"
+http = "0.1"
+hyper = "0.12.2"
+hyper-tls = "0.3"
+native-tls = "0.2"
+tokio-io = "0.1"
+tokio-tls = "0.2"

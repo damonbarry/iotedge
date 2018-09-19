@@ -8,6 +8,8 @@ extern crate chrono;
 #[macro_use]
 extern crate failure;
 extern crate futures;
+#[cfg(test)]
+extern crate http;
 extern crate hyper;
 #[macro_use]
 extern crate log;
@@ -18,8 +20,6 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tokio;
-#[cfg(test)]
-extern crate tokio_core;
 extern crate tokio_timer;
 extern crate url;
 

@@ -17,14 +17,12 @@ use std::io;
 #[cfg(unix)]
 use std::path::Path;
 
-use futures::Future;
-use hyper::client::{HttpConnector, Service};
-use hyper::Uri;
+use futures::{Future, future};
+use hyper::{Uri, client::HttpConnector, client::connect::{Connect, Connected, Destination}};
 #[cfg(windows)]
 use hyper_named_pipe::{PipeConnector, Uri as PipeUri};
 #[cfg(unix)]
 use hyperlocal::{UnixConnector, Uri as HyperlocalUri};
-use tokio_core::reactor::Handle;
 use url::{ParseError, Url};
 
 use error::{Error, ErrorKind};
@@ -45,17 +43,17 @@ pub enum UrlConnector {
 }
 
 impl UrlConnector {
-    pub fn new(url: &Url, handle: &Handle) -> Result<UrlConnector, Error> {
+    pub fn new(url: &Url) -> Result<UrlConnector, Error> {
         match url.scheme() {
             #[cfg(windows)]
-            PIPE_SCHEME => Ok(UrlConnector::Pipe(PipeConnector::new(handle.clone()))),
+            PIPE_SCHEME => Ok(UrlConnector::Pipe(PipeConnector)),
 
             #[cfg(unix)]
             UNIX_SCHEME => {
                 if !Path::new(url.path()).exists() {
                     Err(ErrorKind::InvalidUri(url.to_string()))?
                 } else {
-                    Ok(UrlConnector::Unix(UnixConnector::new(handle.clone())))
+                    Ok(UrlConnector::Unix(UnixConnector::new()))
                 }
             }
 
@@ -63,7 +61,7 @@ impl UrlConnector {
                 // NOTE: We are defaulting to using 4 threads here. Is this a good
                 //       default? This is what the "hyper" crate uses by default at
                 //       this time.
-                Ok(UrlConnector::Http(HttpConnector::new(4, handle)))
+                Ok(UrlConnector::Http(HttpConnector::new(4)))
             }
             _ => Err(ErrorKind::InvalidUri(url.to_string()))?,
         }
@@ -83,32 +81,43 @@ impl UrlConnector {
     }
 }
 
-impl Service for UrlConnector {
-    type Request = Uri;
-    type Response = StreamSelector;
+impl Connect for UrlConnector {
+    type Transport = StreamSelector;
     type Error = io::Error;
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
+    type Future = Box<Future<Item = (Self::Transport, Connected), Error = Self::Error> + Send>;
 
-    fn call(&self, uri: Uri) -> Self::Future {
-        match *self {
-            UrlConnector::Http(ref connector) => Box::new(
+    fn connect(&self, dst: Destination) -> Self::Future {
+        match (self, dst.scheme()) {
+            (UrlConnector::Http(_), HTTP_SCHEME) => (),
+
+            #[cfg(windows)]
+            (UrlConnector::Pipe(_), PIPE_SCHEME) => (),
+
+            #[cfg(unix)]
+            (UrlConnector::Unix(_), UNIX_SCHEME) => (),
+
+            (_, scheme) => return Box::new(future::err(io::Error::new(io::ErrorKind::Other, format!("Invalid scheme {}", scheme)))) as Self::Future,
+        };
+
+        match self {
+            UrlConnector::Http(connector) => Box::new(
                 connector
-                    .call(uri)
-                    .and_then(|tcp_stream| Ok(StreamSelector::Tcp(tcp_stream))),
+                    .connect(dst)
+                    .and_then(|(tcp_stream, connected)| Ok((StreamSelector::Tcp(tcp_stream), connected))),
             ) as Self::Future,
 
             #[cfg(windows)]
-            UrlConnector::Pipe(ref connector) => Box::new(
+            UrlConnector::Pipe(connector) => Box::new(
                 connector
-                    .call(uri)
-                    .and_then(|pipe_stream| Ok(StreamSelector::Pipe(pipe_stream))),
+                    .connect(dst)
+                    .and_then(|(pipe_stream, connected)| Ok((StreamSelector::Pipe(pipe_stream), connected))),
             ) as Self::Future,
 
             #[cfg(unix)]
-            UrlConnector::Unix(ref connector) => Box::new(
+            UrlConnector::Unix(connector) => Box::new(
                 connector
-                    .call(uri)
-                    .and_then(|unix_stream| Ok(StreamSelector::Unix(unix_stream))),
+                    .connect(dst)
+                    .and_then(|(unix_stream, connected)| Ok((StreamSelector::Unix(unix_stream), connected))),
             ) as Self::Future,
         }
     }
@@ -118,7 +127,6 @@ impl Service for UrlConnector {
 mod tests {
     #[cfg(unix)]
     use tempfile::NamedTempFile;
-    use tokio_core::reactor::Core;
     use url::Url;
 
     use super::*;
@@ -126,50 +134,37 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid uri")]
     fn invalid_url_scheme() {
-        let core = Core::new().unwrap();
-        let _connector = UrlConnector::new(
-            &Url::parse("foo:///this/is/not/valid").unwrap(),
-            &core.handle(),
-        ).unwrap();
+        let _connector =
+            UrlConnector::new(&Url::parse("foo:///this/is/not/valid").unwrap()).unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     #[should_panic(expected = "Invalid uri")]
     fn invalid_uds_url() {
-        let core = Core::new().unwrap();
-        let _connector = UrlConnector::new(
-            &Url::parse("unix:///this/file/does/not/exist").unwrap(),
-            &core.handle(),
-        ).unwrap();
+        let _connector =
+            UrlConnector::new(&Url::parse("unix:///this/file/does/not/exist").unwrap()).unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     fn create_uds_succeeds() {
-        let core = Core::new().unwrap();
         let file = NamedTempFile::new().unwrap();
         let file_path = file.path().to_str().unwrap();
-        let _connector = UrlConnector::new(
-            &Url::parse(&format!("unix://{}", file_path)).unwrap(),
-            &core.handle(),
-        ).unwrap();
+        let _connector =
+            UrlConnector::new(&Url::parse(&format!("unix://{}", file_path)).unwrap()).unwrap();
     }
 
     #[test]
     fn create_http_succeeds() {
-        let core = Core::new().unwrap();
-        let _connector = UrlConnector::new(
-            &Url::parse("http://localhost:2375").unwrap(),
-            &core.handle(),
-        ).unwrap();
+        let _connector =
+            UrlConnector::new(&Url::parse("http://localhost:2375").unwrap()).unwrap();
     }
 
     #[cfg(windows)]
     #[test]
     fn create_pipe_succeeds() {
-        let core = Core::new().unwrap();
         let _connector =
-            UrlConnector::new(&Url::parse("npipe://./pipe/boo").unwrap(), &core.handle()).unwrap();
+            UrlConnector::new(&Url::parse("npipe://./pipe/boo").unwrap()).unwrap();
     }
 }

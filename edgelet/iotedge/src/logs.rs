@@ -32,7 +32,7 @@ impl<M> Command for Logs<M>
 where
     M: 'static + ModuleRuntime + Clone,
 {
-    type Future = Box<Future<Item = (), Error = Error>>;
+    type Future = Box<Future<Item = (), Error = Error> + Send>;
 
     fn execute(&mut self) -> Self::Future {
         let id = self.id.clone();

@@ -19,7 +19,10 @@ extern crate serde_derive;
 // Need stuff other than macros from serde_json for non-test code.
 #[cfg(not(test))]
 extern crate serde_json;
-extern crate tokio_core;
+#[cfg(test)]
+extern crate tokio;
+#[cfg(test)]
+extern crate typed_headers;
 extern crate url;
 
 // Need macros from serde_json for unit tests.

@@ -14,6 +14,7 @@ members = [
     "hsm-rs",
     "hsm-sys",
     "hyper-named-pipe",
+    "hyper-proxy",
     "iotedge",
     "iotedged",
     "iothubservice",

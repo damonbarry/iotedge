@@ -7,7 +7,8 @@ extern crate futures;
 extern crate httparse;
 extern crate hyper;
 extern crate rand;
-extern crate tokio_core;
+extern crate tokio;
+extern crate typed_headers;
 
 extern crate edgelet_test_utils;
 extern crate hyper_named_pipe;
@@ -18,10 +19,9 @@ use std::thread;
 use futures::future::Future;
 use futures::Stream;
 use httparse::Request;
-use hyper::header::{ContentLength, ContentType};
-use hyper::{Client as HyperClient, Method, Request as HyperRequest, StatusCode};
+use typed_headers::{ContentType, ContentLength, HeaderMapExt, mime};
+use hyper::{Body, Client as HyperClient, Method, Request as HyperRequest, StatusCode};
 use rand::Rng;
-use tokio_core::reactor::Core;
 
 use edgelet_test_utils::run_pipe_server;
 use hyper_named_pipe::{PipeConnector, Uri};
@@ -51,15 +51,12 @@ fn get() {
     // wait for server to get ready
     receiver.recv().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let hyper_client = HyperClient::configure()
-        .connector(PipeConnector::new(core.handle()))
-        .build(&core.handle());
+    let hyper_client = HyperClient::builder().build::<_, Body>(PipeConnector);
 
     // make a get request
     let task = hyper_client.get(url.into());
-    let response = core.run(task).unwrap();
-    assert_eq!(response.status(), StatusCode::Ok);
+    let response = tokio::runtime::current_thread::Runtime::new().unwrap().block_on(task).unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 const GET_RESPONSE: &str = "The answer is 42";
@@ -89,22 +86,19 @@ fn get_with_body() {
     // wait for server to get ready
     receiver.recv().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let hyper_client = HyperClient::configure()
-        .connector(PipeConnector::new(core.handle()))
-        .build(&core.handle());
+    let hyper_client = HyperClient::builder().build::<_, Body>(PipeConnector);
 
     // make a get request
     let task = hyper_client
         .get(url.into())
         .and_then(|res| {
-            assert_eq!(StatusCode::Ok, res.status());
-            res.body().concat2()
+            assert_eq!(StatusCode::OK, res.status());
+            res.into_body().concat2()
         }).map(|body| {
             assert_eq!(GET_RESPONSE, &String::from_utf8_lossy(body.as_ref()));
         });
 
-    core.run(task).unwrap();
+    tokio::runtime::current_thread::Runtime::new().unwrap().block_on(task).unwrap();
 }
 
 const POST_BODY: &str = r#"{"donuts":"yes"}"#;
@@ -130,20 +124,18 @@ fn post() {
     // wait for server to get ready
     receiver.recv().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let hyper_client = HyperClient::configure()
-        .connector(PipeConnector::new(core.handle()))
-        .build(&core.handle());
+    let hyper_client = HyperClient::builder().build::<_, Body>(PipeConnector);
 
     // make a post request
-    let mut req = HyperRequest::new(Method::Post, url.into());
-    req.headers_mut().set(ContentType::json());
-    req.headers_mut().set(ContentLength(POST_BODY.len() as u64));
-    req.set_body(POST_BODY);
+    let mut req = HyperRequest::new(POST_BODY.into());
+    *req.method_mut() = Method::POST;
+    *req.uri_mut() = url.into();
+    req.headers_mut().typed_insert(&ContentType(mime::APPLICATION_JSON));
+    req.headers_mut().typed_insert(&ContentLength(POST_BODY.len() as u64));
 
     let task = hyper_client.request(req).map(|res| {
-        assert_eq!(StatusCode::Ok, res.status());
+        assert_eq!(StatusCode::OK, res.status());
     });
 
-    core.run(task).unwrap();
+    tokio::runtime::current_thread::Runtime::new().unwrap().block_on(task).unwrap();
 }
