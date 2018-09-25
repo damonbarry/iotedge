@@ -376,7 +376,7 @@ dependencies = [
  "httparse 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper-named-pipe 0.1.0",
- "hyper-proxy 0.1.0",
+ "hyper-proxy 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper-tls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyperlocal 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -714,7 +714,8 @@ dependencies = [
 
 [[package]]
 name = "hyper-proxy"
-version = "0.1.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -724,6 +725,7 @@ dependencies = [
  "native-tls 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tls 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typed-headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2106,6 +2108,7 @@ dependencies = [
 "checksum httparse 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c2f407128745b78abc95c0ffbe4e5d37427fdc0d45470710cfef8c44522a2e37"
 "checksum humantime 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0484fda3e7007f2a4a0d9c3a703ca38c71c54c55602ce4660c419fd32e188c9e"
 "checksum hyper 0.12.10 (registry+https://github.com/rust-lang/crates.io-index)" = "529d00e4c998cced1a15ffd53bbe203917b39ed6071281c16184ab0014ca6ff3"
+"checksum hyper-proxy 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1ca88dbc8a46e9a7530321ae8196527673d24f6ad08ce5b35078fe6a7d4001c6"
 "checksum hyper-tls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "caaee4dea92794a9e697038bd401e264307d1f22c883dbcb6f6618ba0d3b3bd3"
 "checksum hyperlocal 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d063d6d5658623c6ef16f452e11437c0e7e23a6d327470573fe78892dafbc4fb"
 "checksum idna 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "014b298351066f1512874135335d62a789ffe78a9974f94b43ed5621951eaf7d"

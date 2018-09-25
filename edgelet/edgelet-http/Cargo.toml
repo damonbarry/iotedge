@@ -12,6 +12,7 @@ failure_derive = "0.1"
 futures = "0.1"
 http = "0.1"
 hyper = "0.12"
+hyper-proxy = "0.5"
 hyper-tls = "0.3"
 log = "0.4"
 percent-encoding = "1.0"
@@ -26,7 +27,6 @@ url = "1.7"
 
 edgelet-core = { path = "../edgelet-core" }
 edgelet-utils = { path = "../edgelet-utils" }
-hyper-proxy = { path = "../hyper-proxy" }
 systemd = { path = "../systemd" }
 
 [target.'cfg(unix)'.dependencies]
