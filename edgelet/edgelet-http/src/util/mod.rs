@@ -15,6 +15,8 @@ use tokio_named_pipe::PipeStream;
 use tokio_tcp::TcpStream;
 #[cfg(unix)]
 use tokio_uds::UnixStream;
+#[cfg(windows)]
+use tokio_uds_windows::{SocketAddr as UnixSocketAddr, UnixStream};
 
 #[cfg(unix)]
 use pid::UnixStreamExt;
@@ -31,7 +33,6 @@ pub enum StreamSelector {
     Tcp(TcpStream),
     #[cfg(windows)]
     Pipe(PipeStream),
-    #[cfg(unix)]
     Unix(UnixStream),
 }
 
@@ -41,7 +42,6 @@ impl StreamSelector {
             StreamSelector::Tcp(_) => Ok(Pid::Any),
             #[cfg(windows)]
             StreamSelector::Pipe(_) => Ok(Pid::Any),
-            #[cfg(unix)]
             StreamSelector::Unix(ref stream) => stream.pid(),
         }
     }
@@ -53,7 +53,6 @@ impl Read for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => stream.read(buf),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => stream.read(buf),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => stream.read(buf),
         }
     }
@@ -65,7 +64,6 @@ impl Write for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => stream.write(buf),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => stream.write(buf),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => stream.write(buf),
         }
     }
@@ -75,7 +73,6 @@ impl Write for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => stream.flush(),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => stream.flush(),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => stream.flush(),
         }
     }
@@ -88,7 +85,6 @@ impl AsyncRead for StreamSelector {
             StreamSelector::Tcp(ref stream) => stream.prepare_uninitialized_buffer(buf),
             #[cfg(windows)]
             StreamSelector::Pipe(ref stream) => stream.prepare_uninitialized_buffer(buf),
-            #[cfg(unix)]
             StreamSelector::Unix(ref stream) => stream.prepare_uninitialized_buffer(buf),
         }
     }
@@ -99,7 +95,6 @@ impl AsyncRead for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => stream.read_buf(buf),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => stream.read_buf(buf),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => stream.read_buf(buf),
         }
     }
@@ -111,7 +106,6 @@ impl AsyncWrite for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => <&TcpStream>::shutdown(&mut &*stream),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => PipeStream::shutdown(stream),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => <&UnixStream>::shutdown(&mut &*stream),
         }
     }
@@ -122,7 +116,6 @@ impl AsyncWrite for StreamSelector {
             StreamSelector::Tcp(ref mut stream) => stream.write_buf(buf),
             #[cfg(windows)]
             StreamSelector::Pipe(ref mut stream) => stream.write_buf(buf),
-            #[cfg(unix)]
             StreamSelector::Unix(ref mut stream) => stream.write_buf(buf),
         }
     }
@@ -130,7 +123,6 @@ impl AsyncWrite for StreamSelector {
 
 pub enum IncomingSocketAddr {
     Tcp(SocketAddr),
-    #[cfg(unix)]
     Unix(UnixSocketAddr),
 }
 
@@ -138,7 +130,6 @@ impl fmt::Display for IncomingSocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             IncomingSocketAddr::Tcp(ref socket) => socket.fmt(f),
-            #[cfg(unix)]
             IncomingSocketAddr::Unix(ref socket) => {
                 if let Some(path) = socket.as_pathname() {
                     write!(f, "{}", path.display())
@@ -150,7 +141,6 @@ impl fmt::Display for IncomingSocketAddr {
     }
 }
 
-#[cfg(unix)]
 #[cfg(test)]
 mod tests {
     use super::*;

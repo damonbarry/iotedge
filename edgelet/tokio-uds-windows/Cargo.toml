@@ -1,0 +1,12 @@
+[package]
+name = "tokio-uds-windows"
+version = "0.1.0"
+authors = ["Azure IoT Edge Devs"]
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+futures = "0.1"
+tokio-io = "0.1"
+winapi = { version = "0.3", features = ["ntdef", "ws2def"] }
+
+edgelet-core = { path = "../edgelet-core" }

@@ -44,6 +44,8 @@ extern crate tokio_named_pipe;
 extern crate tokio_tcp;
 #[cfg(unix)]
 extern crate tokio_uds;
+#[cfg(windows)]
+extern crate tokio_uds_windows;
 extern crate typed_headers;
 extern crate url;
 
@@ -65,7 +67,11 @@ use systemd::Socket;
 use tokio_tcp::TcpListener;
 #[cfg(unix)]
 use tokio_uds::UnixListener;
+#[cfg(unix)]
+use unix::listener;
 use url::Url;
+#[cfg(windows)]
+use windows::listener;
 
 pub mod authorization;
 pub mod client;
@@ -73,9 +79,12 @@ pub mod error;
 pub mod logging;
 mod pid;
 pub mod route;
+#[cfg(unix)]
 mod unix;
 mod util;
 mod version;
+#[cfg(windows)]
+mod windows;
 
 pub use self::error::{Error, ErrorKind};
 pub use self::util::proxy::MaybeProxyClient;
@@ -87,7 +96,6 @@ use self::util::incoming::Incoming;
 
 const HTTP_SCHEME: &str = "http";
 const TCP_SCHEME: &str = "tcp";
-#[cfg(unix)]
 const UNIX_SCHEME: &str = "unix";
 #[cfg(unix)]
 const FD_SCHEME: &str = "fd";
@@ -218,12 +226,11 @@ impl HyperExt for Http {
 
                 let listener = TcpListener::bind(&addr)?;
                 Incoming::Tcp(listener)
-            }
-            #[cfg(unix)]
+            },
             UNIX_SCHEME => {
                 let path = url.path();
-                unix::listener(path)?
-            }
+                listener(path)?
+            },
             #[cfg(unix)]
             FD_SCHEME => {
                 let host = url

@@ -39,6 +39,7 @@ tokio-uds = "0.2"
 [target.'cfg(windows)'.dependencies]
 hyper-named-pipe = { path = "../hyper-named-pipe" }
 tokio-named-pipe = { path = "../tokio-named-pipe" }
+tokio-uds-windows = { path = "../tokio-uds-windows" }
 
 [dev-dependencies]
 httparse = "1.2"
