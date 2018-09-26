@@ -1,0 +1,12 @@
+[package]
+name = "hyperlocal-windows"
+version = "0.1.0"
+authors = ["Azure IoT Edge Devs"]
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+futures = "0.1"
+hex = "0.3"
+hyper = "0.12"
+
+tokio-uds-windows = { path = "../tokio-uds-windows" }

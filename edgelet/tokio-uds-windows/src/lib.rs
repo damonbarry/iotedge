@@ -56,3 +56,4 @@ impl SocketAddr {
 
 pub use listener::UnixListener;
 pub use stream::UnixStream;
+pub use stream::ConnectFuture;

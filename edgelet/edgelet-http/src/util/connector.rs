@@ -14,7 +14,6 @@
 //! HTTP and Unix sockets respectively.
 
 use std::io;
-#[cfg(unix)]
 use std::path::Path;
 
 use futures::{Future, future};
@@ -23,12 +22,13 @@ use hyper::{Uri, client::HttpConnector, client::connect::{Connect, Connected, De
 use hyper_named_pipe::{PipeConnector, Uri as PipeUri};
 #[cfg(unix)]
 use hyperlocal::{UnixConnector, Uri as HyperlocalUri};
+#[cfg(windows)]
+use hyperlocal_windows::{UnixConnector, Uri as HyperlocalUri};
 use url::{ParseError, Url};
 
 use error::{Error, ErrorKind};
 use util::StreamSelector;
 
-#[cfg(unix)]
 const UNIX_SCHEME: &str = "unix";
 #[cfg(windows)]
 const PIPE_SCHEME: &str = "npipe";
@@ -38,7 +38,6 @@ pub enum UrlConnector {
     Http(HttpConnector),
     #[cfg(windows)]
     Pipe(PipeConnector),
-    #[cfg(unix)]
     Unix(UnixConnector),
 }
 
@@ -48,7 +47,6 @@ impl UrlConnector {
             #[cfg(windows)]
             PIPE_SCHEME => Ok(UrlConnector::Pipe(PipeConnector)),
 
-            #[cfg(unix)]
             UNIX_SCHEME => {
                 if !Path::new(url.path()).exists() {
                     Err(ErrorKind::InvalidUri(url.to_string()))?
@@ -71,7 +69,6 @@ impl UrlConnector {
         match scheme {
             #[cfg(windows)]
             PIPE_SCHEME => Ok(PipeUri::new(base_path, path)?.into()),
-            #[cfg(unix)]
             UNIX_SCHEME => Ok(HyperlocalUri::new(base_path, path).into()),
             HTTP_SCHEME => Ok(Url::parse(base_path)
                 .and_then(|base| base.join(path))
@@ -93,7 +90,6 @@ impl Connect for UrlConnector {
             #[cfg(windows)]
             (UrlConnector::Pipe(_), PIPE_SCHEME) => (),
 
-            #[cfg(unix)]
             (UrlConnector::Unix(_), UNIX_SCHEME) => (),
 
             (_, scheme) => return Box::new(future::err(io::Error::new(io::ErrorKind::Other, format!("Invalid scheme {}", scheme)))) as Self::Future,
@@ -113,7 +109,6 @@ impl Connect for UrlConnector {
                     .and_then(|(pipe_stream, connected)| Ok((StreamSelector::Pipe(pipe_stream), connected))),
             ) as Self::Future,
 
-            #[cfg(unix)]
             UrlConnector::Unix(connector) => Box::new(
                 connector
                     .connect(dst)
@@ -125,7 +120,6 @@ impl Connect for UrlConnector {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(unix)]
     use tempfile::NamedTempFile;
     use url::Url;
 
@@ -138,7 +132,6 @@ mod tests {
             UrlConnector::new(&Url::parse("foo:///this/is/not/valid").unwrap()).unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
     #[should_panic(expected = "Invalid uri")]
     fn invalid_uds_url() {
@@ -146,7 +139,6 @@ mod tests {
             UrlConnector::new(&Url::parse("unix:///this/file/does/not/exist").unwrap()).unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
     fn create_uds_succeeds() {
         let file = NamedTempFile::new().unwrap();

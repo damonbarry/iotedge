@@ -18,6 +18,8 @@ extern crate hyper_proxy;
 extern crate hyper_tls;
 #[cfg(unix)]
 extern crate hyperlocal;
+#[cfg(windows)]
+extern crate hyperlocal_windows;
 #[cfg(target_os = "linux")]
 #[cfg(unix)]
 extern crate libc;
