@@ -13,5 +13,6 @@ COPY $EXE_DIR/ ./
 RUN adduser -Ds /bin/sh moduleuser 
 USER moduleuser
 
-CMD echo "$(date --utc +"[%Y-%m-%d %H:%M:%S %:z]"): Starting Module" && \
-    exec /usr/bin/dotnet SimulatedTemperatureSensor.dll
+ENTRYPOINT \
+    echo "$(date --utc +"[%Y-%m-%d %H:%M:%S %:z]"): Starting Module" && \
+    exec /run.sh
