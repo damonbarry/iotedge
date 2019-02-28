@@ -24,4 +24,4 @@ Improvements are proposed in two areas:
 
 ## Considerations
 
-Once of the original goals of the Quickstart binary was that you could run it from your desktop with few-or-no arguments to quickly validate the most basic functionality of our product. You would lost this ability if we replaced the app with a library. However, in reality people aren't running Quickstart from their desktops much these days, probably because we now have the end-to-end tests in place. Also, one could easily use the library to write such an app--perhaps we'd still have a binary called Quickstart(.exe) for just that purpose.
+One of the original goals of the Quickstart binary was that you could run it from your desktop with few-or-no arguments to quickly validate the most basic functionality of our product. We would lose this ability if we replaced the app with a library. However, in reality people aren't running Quickstart from their desktops much these days, probably because we now have the end-to-end tests in place. Also, one could easily use the library to write such an app--perhaps we'd still have a binary called Quickstart(.exe) for just that purpose.
