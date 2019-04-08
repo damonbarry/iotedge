@@ -3,7 +3,6 @@ pr: none
 
 variables:
   Build.SyncSources: false
-  images.artifact.name: 'core-linux'
   vsts.project: $(System.TeamProjectId)
   # Variable defined in VSTS
   #azure.keyVault: ''
@@ -36,7 +35,8 @@ jobs:
         - Agent.OS -equals Linux
         - Agent.OSArchitecture -equals X64
     variables:
-      edgelet.artifact.name: 'iotedged-ubuntu-amd64'
+      edgelet.artifact.name: iotedged-ubuntu-amd64
+      images.artifact.name: e2e-linux-x64
     steps:
       - task: AzureKeyVault@1
         displayName: 'Azure Key Vault'
@@ -63,7 +63,7 @@ jobs:
           buildVersionToDownload: latestFromBranch
           artifactName: $(images.artifact.name)
           itemPattern: |
-            $(images.artifact.name)/IotEdgeQuickstart.linux-x64.tar.gz
+            $(images.artifact.name)/IotEdgeQuickstart.tar.gz
             $(images.artifact.name)/e2e_deployment_files/stress_deployment.template.json
             $(images.artifact.name)/scripts/linux/runE2ETest.sh
             $(images.artifact.name)/artifactInfo.txt
@@ -96,7 +96,8 @@ jobs:
         - Agent.OSArchitecture -equals ARM
         - test-protocol -equals amqp
     variables:
-      edgelet.artifact.name: 'iotedged-ubuntu-armhf'
+      edgelet.artifact.name: iotedged-ubuntu-armhf
+      images.artifact.name: e2e-linux-arm
     steps:
       - task: AzureKeyVault@1
         displayName: 'Azure Key Vault'
@@ -123,7 +124,7 @@ jobs:
           buildVersionToDownload: latestFromBranch
           artifactName: $(images.artifact.name)
           itemPattern: |
-            $(images.artifact.name)/IotEdgeQuickstart.linux-arm.tar.gz
+            $(images.artifact.name)/IotEdgeQuickstart.tar.gz
             $(images.artifact.name)/e2e_deployment_files/stress_deployment.template.json
             $(images.artifact.name)/scripts/linux/runE2ETest.sh
             $(images.artifact.name)/artifactInfo.txt
@@ -162,7 +163,8 @@ jobs:
         - Agent.OSArchitecture -equals ARM
         - test-protocol -equals mqtt
     variables:
-      edgelet.artifact.name: 'iotedged-ubuntu-armhf'
+      edgelet.artifact.name: iotedged-ubuntu-armhf
+      images.artifact.name: e2e-linux-arm
     steps:
       - task: AzureKeyVault@1
         displayName: 'Azure Key Vault'
@@ -189,7 +191,7 @@ jobs:
           buildVersionToDownload: latestFromBranch
           artifactName: $(images.artifact.name)
           itemPattern: |
-            $(images.artifact.name)/IotEdgeQuickstart.linux-arm.tar.gz
+            $(images.artifact.name)/IotEdgeQuickstart.tar.gz
             $(images.artifact.name)/e2e_deployment_files/stress_deployment.template.json
             $(images.artifact.name)/scripts/linux/runE2ETest.sh
             $(images.artifact.name)/artifactInfo.txt

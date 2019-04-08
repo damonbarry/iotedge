@@ -34,14 +34,14 @@ steps:
     buildVersionToDownload: latestFromBranch
     branchName: refs/heads/master
     downloadType: specific
-    itemPattern: core-linux/IotEdgeQuickstart.linux-x64.tar.gz
+    itemPattern: e2e-linux-x64/IotEdgeQuickstart.tar.gz
 
 - script: |
     mkdir -p $(System.ArtifactsDirectory)/smoke
     tar \
       -C $(System.ArtifactsDirectory)/smoke \
-      -xzf $(System.ArtifactsDirectory)/core-linux/IotEdgeQuickstart.linux-x64.tar.gz
-    rm -r $(System.ArtifactsDirectory)/core-linux
+      -xzf $(System.ArtifactsDirectory)/e2e-linux-x64/IotEdgeQuickstart.tar.gz
+    rm -r $(System.ArtifactsDirectory)/e2e-linux-x64
   displayName: Install smoke tests
 
 - script: |
