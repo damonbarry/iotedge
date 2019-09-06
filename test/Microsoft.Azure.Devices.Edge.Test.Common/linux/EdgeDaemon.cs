@@ -23,6 +23,8 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Linux
 
         static async Task InstallAsync(Option<string> packagesPath, CancellationToken token)
         {
+            EnableDaemonDebugLogs();
+
             var properties = new object[] { };
             string message = "Installed edge daemon";
             packagesPath.ForEach(
@@ -216,6 +218,17 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Linux
 
                 await Task.Delay(250, token).ConfigureAwait(false);
             }
+        }
+
+        static void EnableDaemonDebugLogs()
+        {
+            var contents = new[]
+            {
+                "[Service]",
+                "Environment=IOTEDGE_LOG=edgelet=debug"
+            };
+            var info = Directory.CreateDirectory("/etc/systemd/system/iotedge.service.d");
+            File.WriteAllLines(Path.Combine(info.FullName, "override.conf"), contents);
         }
     }
 }
