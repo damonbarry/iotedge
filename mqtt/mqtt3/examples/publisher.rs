@@ -6,6 +6,9 @@
 
 mod common;
 
+use std::convert::TryInto;
+use opentelemetry::{api::{Key, Provider, Span, TracerGenerics}, global, sdk};
+
 #[derive(Debug, structopt::StructOpt)]
 struct Options {
     #[structopt(help = "Address of the MQTT server.", long = "server")]
@@ -63,12 +66,35 @@ struct Options {
     payload: String,
 }
 
+fn init_tracer() -> thrift::Result<()> {
+    let exporter = opentelemetry_jaeger::Exporter::builder()
+        .with_agent_endpoint("127.0.0.1:6831".parse().unwrap())
+        .with_process(opentelemetry_jaeger::Process {
+            service_name: "mqtt_publisher".to_string(),
+            tags: vec![],
+        })
+        .init()?;
+    let provider = sdk::Provider::builder()
+        .with_simple_exporter(exporter)
+        .with_config(sdk::Config {
+            default_sampler: Box::new(sdk::Sampler::Always),
+            ..Default::default()
+        })
+        .build();
+    global::set_provider(provider);
+
+    Ok(())
+}
+
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::new().filter_or(
         "MQTT3_LOG",
         "mqtt3=debug,mqtt3::logging=trace,publisher=info",
     ))
     .init();
+
+    init_tracer().expect("couldn't initialize tracer");
+    let tracer = global::trace_provider().get_tracer("publisher-main");
 
     let Options {
         server,
@@ -120,25 +146,28 @@ fn main() {
     runtime_handle.clone().spawn(async move {
         use futures_util::StreamExt;
 
-        let mut interval = tokio::time::interval(publish_frequency);
-        while let Some(_) = interval.next().await {
-            let topic = topic.clone();
-            log::info!("Publishing to {} ...", topic);
+        let mut interval = tokio::time::interval(publish_frequency).enumerate();
+        while let Some((i, _)) = interval.next().await {
+            tracer.with_span("publish", |span| {
+                span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
+                let topic = topic.clone();
+                log::info!("Publishing to {} ...", topic);
 
-            let mut publish_handle = publish_handle.clone();
-            let payload = payload.clone();
-            runtime_handle.spawn(async move {
-                let result = publish_handle
-                    .publish(mqtt3::proto::Publication {
-                        topic_name: topic.clone(),
-                        qos,
-                        retain: false,
-                        payload,
-                    })
-                    .await;
-                let () = result.expect("couldn't publish");
-                log::info!("Published to {}", topic);
-                Ok::<_, ()>(())
+                let mut publish_handle = publish_handle.clone();
+                let payload = payload.clone();
+                runtime_handle.spawn(async move {
+                    publish_handle
+                        .publish(mqtt3::proto::Publication {
+                            topic_name: topic.clone(),
+                            qos,
+                            retain: false,
+                            payload,
+                        })
+                        .await
+                        .expect("couldn't publish");
+                    log::info!("Published to {}", topic);
+                    Ok::<_, ()>(())
+                });
             });
         }
     });
