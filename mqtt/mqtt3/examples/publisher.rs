@@ -162,7 +162,7 @@ fn main() {
                     context.trace_flags() & TRACE_FLAG_SAMPLED    
                 );
 
-                let topic = topic.clone();
+                let topic = format!("{}/traceparent={}", topic, traceparent);
                 log::info!("Publishing to {} ...", topic);
 
                 let mut publish_handle = publish_handle.clone();
@@ -170,7 +170,7 @@ fn main() {
                 runtime_handle.spawn(async move {
                     publish_handle
                         .publish(mqtt3::proto::Publication {
-                            topic_name: format!("{}/{}", topic, traceparent),
+                            topic_name: topic.clone(),
                             qos,
                             retain: false,
                             payload,

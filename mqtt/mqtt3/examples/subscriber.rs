@@ -98,8 +98,8 @@ fn main() {
         qos,
     } = structopt::StructOpt::from_args();
 
-    let topic_filter = if !topic_filter.ends_with("/#") {
-        format!("{}/#", topic_filter)
+    let topic_filter = if !topic_filter.ends_with("/+") && !topic_filter.ends_with("/#") {
+        format!("{}/+", topic_filter)
     } else {
         topic_filter
     };
@@ -161,7 +161,7 @@ fn main() {
 
                 let traceparent = segments.last().expect("received publication's topic doesn't contain any segments");
 
-                if let Ok(span_context) = extract_span_context(traceparent) {
+                if let Ok(Some(span_context)) = extract_span_context(traceparent) {
                     with_span(&tracer, "subscriber_receive", span_context, |span| {
                         span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
     
@@ -233,8 +233,13 @@ impl FromStr for Topic {
 
 static MAX_VERSION: u8 = 254;
 
-fn extract_span_context(value: &str) -> Result<SpanContext, ()> {
-    let parts = value.split_terminator('-').collect::<Vec<&str>>();
+fn extract_span_context(string: &str) -> Result<Option<SpanContext>, ()> {
+    let values = string.splitn(2, "=").collect::<Vec<&str>>();
+    if values.len() < 2 || values[0] != "traceparent" {
+        return Ok(None)
+    }
+
+    let parts = values[1].split_terminator('-').collect::<Vec<&str>>();
     // Ensure parts are not out of range.
     if parts.len() < 4 {
         return Err(());
@@ -270,7 +275,7 @@ fn extract_span_context(value: &str) -> Result<SpanContext, ()> {
         return Err(());
     }
 
-    Ok(span_context)
+    Ok(Some(span_context))
 }
 
 fn with_span<R, F, T>(tracer: &T, name: &'static str, parent: SpanContext,  f: F) -> R
