@@ -7,7 +7,9 @@
 mod common;
 
 use std::convert::TryInto;
-use opentelemetry::{api::{Key, Provider, Span, TracerGenerics}, global, sdk};
+use opentelemetry::{api::{Key, Provider, Span, TracerGenerics, TRACE_FLAG_SAMPLED}, global, sdk};
+
+static SUPPORTED_VERSION: u8 = 0;
 
 #[derive(Debug, structopt::StructOpt)]
 struct Options {
@@ -150,6 +152,16 @@ fn main() {
         while let Some((i, _)) = interval.next().await {
             tracer.with_span("publish", |span| {
                 span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
+
+                let context = span.get_context();
+                let traceparent = format!(
+                    "{:02x}-{:032x}-{:016x}-{:02x}",
+                    SUPPORTED_VERSION,
+                    context.trace_id(),
+                    context.span_id(),
+                    context.trace_flags() & TRACE_FLAG_SAMPLED    
+                );
+
                 let topic = topic.clone();
                 log::info!("Publishing to {} ...", topic);
 
@@ -158,7 +170,7 @@ fn main() {
                 runtime_handle.spawn(async move {
                     publish_handle
                         .publish(mqtt3::proto::Publication {
-                            topic_name: topic.clone(),
+                            topic_name: format!("{}/{}", topic, traceparent),
                             qos,
                             retain: false,
                             payload,

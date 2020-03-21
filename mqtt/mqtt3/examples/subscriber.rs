@@ -7,7 +7,9 @@
 mod common;
 
 use std::convert::TryInto;
-use opentelemetry::{api::{Key, Provider, Span, TracerGenerics}, global, sdk};
+use std::str::FromStr;
+
+use opentelemetry::{api::{Key, Provider, Span, SpanContext, Tracer, TRACE_FLAGS_UNUSED}, global, sdk};
 
 #[derive(Debug, structopt::StructOpt)]
 struct Options {
@@ -96,6 +98,12 @@ fn main() {
         qos,
     } = structopt::StructOpt::from_args();
 
+    let topic_filter = if !topic_filter.ends_with("/#") {
+        format!("{}/#", topic_filter)
+    } else {
+        topic_filter
+    };
+
     let mut runtime = tokio::runtime::Runtime::new().expect("couldn't initialize tokio runtime");
 
     let client = mqtt3::Client::new(
@@ -142,43 +150,146 @@ fn main() {
         let mut client = client.enumerate();
 
         while let Some((i, event)) = client.next().await {
-            tracer.with_span("subscriber_receive", |span| {
-                span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
-                let event = event.unwrap();
+            let event = event.unwrap();
 
-                if let mqtt3::Event::Publication(publication) = event {
-                    match std::str::from_utf8(&publication.payload) {
-                        Ok(s) => {
-                            log::info!(
-                                "Received publication: {:?} {:?} {:?}",
-                                publication.topic_name,
-                                s,
-                                publication.qos,
-                            );
-                            span.add_event(format!(
-                                "Received publication: {:?} {:?} {:?}",
-                                publication.topic_name,
-                                s,
-                                publication.qos
-                            ))
-                        },
-                        Err(_) => {
-                            log::info!(
-                                "Received publication: {:?} {:?} {:?}",
-                                publication.topic_name,
-                                publication.payload,
-                                publication.qos,
-                            );
-                            span.add_event(format!(
-                                "(Failed to convert bytes to UTF-8) Received publication: {:?} {:?} {:?}",
-                                publication.topic_name,
-                                publication.payload,
-                                publication.qos
-                            ))
-                        },
-                    }
+            if let mqtt3::Event::Publication(publication) = event {
+                let segments = publication
+                    .topic_name
+                    .parse::<Topic>()
+                    .expect("couldn't parse received publication's topic")
+                    .segments;
+
+                let traceparent = segments.last().expect("received publication's topic doesn't contain any segments");
+
+                if let Ok(span_context) = extract_span_context(traceparent) {
+                    with_span(&tracer, "subscriber_receive", span_context, |span| {
+                        span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
+    
+                        match std::str::from_utf8(&publication.payload) {
+                            Ok(s) => {
+                                log::info!(
+                                    "Received publication: {:?} {:?} {:?}",
+                                    publication.topic_name,
+                                    s,
+                                    publication.qos,
+                                );
+                                span.add_event(format!(
+                                    "Received publication: {:?} {:?} {:?}",
+                                    publication.topic_name,
+                                    s,
+                                    publication.qos
+                                ))
+                            },
+                            Err(_) => {
+                                log::info!(
+                                    "Received publication: {:?} {:?} {:?}",
+                                    publication.topic_name,
+                                    publication.payload,
+                                    publication.qos,
+                                );
+                                span.add_event(format!(
+                                    "(Failed to convert bytes to UTF-8) Received publication: {:?} {:?} {:?}",
+                                    publication.topic_name,
+                                    publication.payload,
+                                    publication.qos
+                                ))
+                            },
+                        }
+                    });
                 }
-            });
+            }
         }
     });
+}
+
+const NUL_CHAR: char = '\0';
+const TOPIC_SEPARATOR: char = '/';
+
+struct Topic {
+    segments: Vec<String>,
+}
+
+impl FromStr for Topic {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        // [MQTT-4.7.3-1] - All Topic Names and Topic Filters MUST be at least
+        // one character long.
+        // [MQTT-4.7.3-2] - Topic Names and Topic Filters MUST NOT include the
+        // null character (Unicode U+0000).
+        if string.is_empty() || string.contains(NUL_CHAR) {
+            return Err(());
+        }
+
+        let mut segments = Vec::new();
+        for s in string.split(TOPIC_SEPARATOR) {
+            segments.push(s.to_owned());
+        }
+
+        let topic = Topic { segments };
+        Ok(topic)
+    }
+}
+
+static MAX_VERSION: u8 = 254;
+
+fn extract_span_context(value: &str) -> Result<SpanContext, ()> {
+    let parts = value.split_terminator('-').collect::<Vec<&str>>();
+    // Ensure parts are not out of range.
+    if parts.len() < 4 {
+        return Err(());
+    }
+
+    // Ensure version is within range, for version 0 there must be 4 parts.
+    let version = u8::from_str_radix(parts[0], 16).map_err(|_| ())?;
+    if version > MAX_VERSION || version == 0 && parts.len() != 4 {
+        return Err(());
+    }
+
+    // Parse trace id section
+    let trace_id = u128::from_str_radix(parts[1], 16).map_err(|_| ())?;
+
+    // Parse span id section
+    let span_id = u64::from_str_radix(parts[2], 16).map_err(|_| ())?;
+
+    // Parse trace flags section
+    let opts = u8::from_str_radix(parts[3], 16).map_err(|_| ())?;
+
+    // Ensure opts are valid for version 0
+    if version == 0 && opts > 2 {
+        return Err(());
+    }
+    // Build trace flags
+    let trace_flags = opts & !TRACE_FLAGS_UNUSED;
+
+    // create context
+    let span_context = SpanContext::new(trace_id, span_id, trace_flags, true);
+
+    // Ensure span is valid
+    if !span_context.is_valid() {
+        return Err(());
+    }
+
+    Ok(span_context)
+}
+
+fn with_span<R, F, T>(tracer: &T, name: &'static str, parent: SpanContext,  f: F) -> R
+where
+    F: FnOnce(&mut T::Span) -> R,
+    T: Tracer,
+{
+    let parent = if parent.is_valid() {
+        Some(parent)
+    } else {
+        None
+    };
+
+    let mut span = tracer.start(name, parent);
+    tracer.mark_span_as_active(&span);
+
+    let result = f(&mut span);
+    span.end();
+    tracer.mark_span_as_inactive(span.get_context().span_id());
+
+    result
 }
