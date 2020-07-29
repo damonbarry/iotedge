@@ -7,7 +7,11 @@
 mod common;
 
 use std::convert::TryInto;
-use opentelemetry::{api::{Key, Provider, Span, TracerGenerics, TRACE_FLAG_SAMPLED}, global, sdk};
+
+use opentelemetry::{
+    api::{Key, TraceContextExt, Tracer, TRACE_FLAG_SAMPLED},
+    global, sdk,
+};
 
 static SUPPORTED_VERSION: u8 = 0;
 
@@ -79,7 +83,7 @@ fn init_tracer() -> thrift::Result<()> {
     let provider = sdk::Provider::builder()
         .with_simple_exporter(exporter)
         .with_config(sdk::Config {
-            default_sampler: Box::new(sdk::Sampler::Always),
+            default_sampler: Box::new(sdk::Sampler::AlwaysOn),
             ..Default::default()
         })
         .build();
@@ -96,7 +100,7 @@ fn main() {
     .init();
 
     init_tracer().expect("couldn't initialize tracer");
-    let tracer = global::trace_provider().get_tracer("publisher-main");
+    let tracer = global::tracer("publisher-main");
 
     let Options {
         server,
@@ -150,16 +154,17 @@ fn main() {
 
         let mut interval = tokio::time::interval(publish_frequency).enumerate();
         while let Some((i, _)) = interval.next().await {
-            tracer.with_span("publish", |span| {
+            tracer.in_span("publish", |context| {
+                let span = context.span();
                 span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
 
-                let context = span.get_context();
+                let span_context = span.span_context();
                 let traceparent = format!(
                     "{:02x}-{:032x}-{:016x}-{:02x}",
                     SUPPORTED_VERSION,
-                    context.trace_id(),
-                    context.span_id(),
-                    context.trace_flags() & TRACE_FLAG_SAMPLED    
+                    span_context.trace_id().to_u128(),
+                    span_context.span_id().to_u64(),
+                    span_context.trace_flags() & TRACE_FLAG_SAMPLED
                 );
 
                 let topic = format!("{}/traceparent={}", topic, traceparent);

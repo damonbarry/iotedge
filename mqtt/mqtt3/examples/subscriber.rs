@@ -9,7 +9,13 @@ mod common;
 use std::convert::TryInto;
 use std::str::FromStr;
 
-use opentelemetry::{api::{Key, Provider, Span, SpanContext, Tracer, TRACE_FLAGS_UNUSED}, global, sdk};
+use opentelemetry::{
+    api::{
+        context::Context, Key, SpanContext, SpanId, TraceContextExt, TraceId, Tracer,
+        TRACE_FLAG_SAMPLED,
+    },
+    global, sdk,
+};
 
 #[derive(Debug, structopt::StructOpt)]
 struct Options {
@@ -68,7 +74,7 @@ fn init_tracer() -> thrift::Result<()> {
     let provider = sdk::Provider::builder()
         .with_simple_exporter(exporter)
         .with_config(sdk::Config {
-            default_sampler: Box::new(sdk::Sampler::Always),
+            default_sampler: Box::new(sdk::Sampler::AlwaysOn),
             ..Default::default()
         })
         .build();
@@ -85,7 +91,7 @@ fn main() {
     .init();
 
     init_tracer().expect("couldn't initialize tracer");
-    let tracer = global::trace_provider().get_tracer("subscriber-main");
+    let tracer = global::tracer("subscriber-main");
 
     let Options {
         server,
@@ -162,9 +168,10 @@ fn main() {
                 let traceparent = segments.last().expect("received publication's topic doesn't contain any segments");
 
                 if let Ok(Some(span_context)) = extract_span_context(traceparent) {
-                    with_span(&tracer, "subscriber_receive", span_context, |span| {
+                    let _attach = Context::current().with_remote_span_context(span_context);
+                    tracer.in_span("subscriber_receive", |context| {
+                        let span = context.span();
                         span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
-    
                         match std::str::from_utf8(&publication.payload) {
                             Ok(s) => {
                                 log::info!(
@@ -178,7 +185,7 @@ fn main() {
                                     publication.topic_name,
                                     s,
                                     publication.qos
-                                ))
+                                ), vec![])
                             },
                             Err(_) => {
                                 log::info!(
@@ -192,7 +199,7 @@ fn main() {
                                     publication.topic_name,
                                     publication.payload,
                                     publication.qos
-                                ))
+                                ), vec![])
                             },
                         }
                     });
@@ -236,7 +243,7 @@ static MAX_VERSION: u8 = 254;
 fn extract_span_context(string: &str) -> Result<Option<SpanContext>, ()> {
     let values = string.splitn(2, "=").collect::<Vec<&str>>();
     if values.len() < 2 || values[0] != "traceparent" {
-        return Ok(None)
+        return Ok(None);
     }
 
     let parts = values[1].split_terminator('-').collect::<Vec<&str>>();
@@ -265,10 +272,15 @@ fn extract_span_context(string: &str) -> Result<Option<SpanContext>, ()> {
         return Err(());
     }
     // Build trace flags
-    let trace_flags = opts & !TRACE_FLAGS_UNUSED;
+    let trace_flags = opts & TRACE_FLAG_SAMPLED;
 
     // create context
-    let span_context = SpanContext::new(trace_id, span_id, trace_flags, true);
+    let span_context = SpanContext::new(
+        TraceId::from_u128(trace_id),
+        SpanId::from_u64(span_id),
+        trace_flags,
+        true,
+    );
 
     // Ensure span is valid
     if !span_context.is_valid() {
@@ -276,25 +288,4 @@ fn extract_span_context(string: &str) -> Result<Option<SpanContext>, ()> {
     }
 
     Ok(Some(span_context))
-}
-
-fn with_span<R, F, T>(tracer: &T, name: &'static str, parent: SpanContext,  f: F) -> R
-where
-    F: FnOnce(&mut T::Span) -> R,
-    T: Tracer,
-{
-    let parent = if parent.is_valid() {
-        Some(parent)
-    } else {
-        None
-    };
-
-    let mut span = tracer.start(name, parent);
-    tracer.mark_span_as_active(&span);
-
-    let result = f(&mut span);
-    span.end();
-    tracer.mark_span_as_inactive(span.get_context().span_id());
-
-    result
 }

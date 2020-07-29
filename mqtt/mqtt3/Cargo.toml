@@ -20,8 +20,8 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 [dev-dependencies]
 env_logger = "0.7"
 structopt = "0.3"
-opentelemetry = "0.2"
-opentelemetry-jaeger = "0.1"
+opentelemetry = "0.7"
+opentelemetry-jaeger = "0.6"
 thrift = "0.13"
 tokio = { version = "0.2", features = ["rt-core", "signal", "stream", "tcp"] }
 
