@@ -9,7 +9,7 @@ mod common;
 use std::convert::TryInto;
 
 use opentelemetry::{
-    api::{Key, TraceContextExt, Tracer, TRACE_FLAG_SAMPLED},
+    api::{Key, SpanKind, TraceContextExt, Tracer, TRACE_FLAG_SAMPLED},
     global, sdk,
 };
 
@@ -154,11 +154,13 @@ fn main() {
 
         let mut interval = tokio::time::interval(publish_frequency).enumerate();
         while let Some((i, _)) = interval.next().await {
-            tracer.in_span("publish", |context| {
-                let span = context.span();
-                span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
-
-                let span_context = span.span_context();
+            let span = tracer
+                .span_builder("publish")
+                .with_kind(SpanKind::Producer)
+                .with_attributes(vec![Key::from("iteration").u64(i.try_into().unwrap())])
+                .start(&tracer);
+            tracer.with_span(span, |context| {
+                let span_context = context.span().span_context();
                 let traceparent = format!(
                     "{:02x}-{:032x}-{:016x}-{:02x}",
                     SUPPORTED_VERSION,
@@ -168,7 +170,7 @@ fn main() {
                 );
 
                 let topic = format!("{}/traceparent={}", topic, traceparent);
-                log::info!("Publishing to {} ...", topic);
+                log::info!("[{}] Publishing to {} ...", i, topic);
 
                 let mut publish_handle = publish_handle.clone();
                 let payload = payload.clone();
@@ -182,7 +184,7 @@ fn main() {
                         })
                         .await
                         .expect("couldn't publish");
-                    log::info!("Published to {}", topic);
+                    log::info!("[{}] Published to {}", i, topic);
                     Ok::<_, ()>(())
                 });
             });

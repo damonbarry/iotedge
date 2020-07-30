@@ -11,11 +11,13 @@ use std::str::FromStr;
 
 use opentelemetry::{
     api::{
-        context::Context, Key, SpanContext, SpanId, TraceContextExt, TraceId, Tracer,
+        context::Context, Key, SpanContext, SpanId, SpanKind, TraceContextExt, TraceId, Tracer,
         TRACE_FLAG_SAMPLED,
     },
     global, sdk,
 };
+
+static SUPPORTED_VERSION: u8 = 0;
 
 #[derive(Debug, structopt::StructOpt)]
 struct Options {
@@ -165,42 +167,50 @@ fn main() {
                     .expect("couldn't parse received publication's topic")
                     .segments;
 
-                let traceparent = segments.last().expect("received publication's topic doesn't contain any segments");
+                let traceparent = segments
+                    .last()
+                    .expect("received publication's topic doesn't contain any segments");
 
                 if let Ok(Some(span_context)) = extract_span_context(traceparent) {
-                    let _attach = Context::current().with_remote_span_context(span_context);
-                    tracer.in_span("subscriber_receive", |context| {
-                        let span = context.span();
-                        span.set_attribute(Key::from("iteration").u64(i.try_into().unwrap()));
+                    let _attach = Context::current()
+                        .with_remote_span_context(span_context)
+                        .attach();
+                    let span = tracer
+                        .span_builder("subscriber_receive")
+                        .with_kind(SpanKind::Consumer)
+                        .with_attributes(vec![Key::from("iteration").u64(i.try_into().unwrap())])
+                        .start(&tracer);
+                    tracer.with_span(span, |context| {
+                        let span_context = context.span().span_context();
+                        let traceparent = format!(
+                            "{:02x}-{:032x}-{:016x}-{:02x}",
+                            SUPPORTED_VERSION,
+                            span_context.trace_id().to_u128(),
+                            span_context.span_id().to_u64(),
+                            span_context.trace_flags() & TRACE_FLAG_SAMPLED
+                        );
                         match std::str::from_utf8(&publication.payload) {
                             Ok(s) => {
                                 log::info!(
-                                    "Received publication: {:?} {:?} {:?}",
+                                    "[{}] Received publication: {:?} {:?} {:?} \"{}\"",
+                                    i,
                                     publication.topic_name,
                                     s,
                                     publication.qos,
+                                    traceparent,
                                 );
-                                span.add_event(format!(
-                                    "Received publication: {:?} {:?} {:?}",
-                                    publication.topic_name,
-                                    s,
-                                    publication.qos
-                                ), vec![])
-                            },
-                            Err(_) => {
+                            }
+                            Err(e) => {
                                 log::info!(
-                                    "Received publication: {:?} {:?} {:?}",
+                                    "[{}] Received publication: {:?} {:?} {:?} \"{}\"\nPayload conversion error: {:?}",
+                                    i,
                                     publication.topic_name,
                                     publication.payload,
                                     publication.qos,
+                                    traceparent,
+                                    e,
                                 );
-                                span.add_event(format!(
-                                    "(Failed to convert bytes to UTF-8) Received publication: {:?} {:?} {:?}",
-                                    publication.topic_name,
-                                    publication.payload,
-                                    publication.qos
-                                ), vec![])
-                            },
+                            }
                         }
                     });
                 }
