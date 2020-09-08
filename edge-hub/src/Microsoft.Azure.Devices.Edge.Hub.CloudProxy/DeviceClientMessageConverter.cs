@@ -75,6 +75,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
                 {
                     message.SetAsSecurityMessage();
                 }
+
+                if (inputMessage.SystemProperties.TryGetNonEmptyValue(SystemProperties.TraceParent, out string traceParent))
+                {
+                    message.TraceParent = traceParent;
+                }
+
+                if (inputMessage.SystemProperties.TryGetNonEmptyValue(SystemProperties.TraceState, out string traceState))
+                {
+                    message.TraceState = traceState;
+                }
             }
 
             return message;
@@ -95,6 +105,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             message.SystemProperties.AddIfNonEmpty(SystemProperties.MessageSchema, sourceMessage.MessageSchema);
             message.SystemProperties.AddIfNonEmpty(SystemProperties.LockToken, sourceMessage.LockToken);
             message.SystemProperties.AddIfNonEmpty(SystemProperties.DeliveryCount, sourceMessage.DeliveryCount.ToString());
+            message.SystemProperties.AddIfNonEmpty(SystemProperties.TraceParent, sourceMessage.TraceParent);
+            message.SystemProperties.AddIfNonEmpty(SystemProperties.TraceState, sourceMessage.TraceState);
 
             if (sourceMessage.SequenceNumber > 0)
             {
