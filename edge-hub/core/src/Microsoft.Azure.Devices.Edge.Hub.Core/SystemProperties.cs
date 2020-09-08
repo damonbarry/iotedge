@@ -35,6 +35,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
         public const string SequenceNumber = "sequenceNumber";
         public const string InterfaceId = "iothub-interface-id";
         public const string ModelId = "modelId";
+        public const string TraceParent = "traceparent";
+        public const string TraceState = "tracestate";
 
         public static readonly Dictionary<string, string> IncomingSystemPropertiesMap = new Dictionary<string, string>
         {
@@ -50,7 +52,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
             { OnTheWireSystemPropertyNames.MessageSchemaOnTheWireName, MessageSchema },
             { OnTheWireSystemPropertyNames.OperationOnTheWireName, Operation },
             { OnTheWireSystemPropertyNames.CreationTimeOnTheWireName, CreationTime },
-            { OnTheWireSystemPropertyNames.InterfaceIdOnTheWireName, InterfaceId }
+            { OnTheWireSystemPropertyNames.InterfaceIdOnTheWireName, InterfaceId },
+            { OnTheWireSystemPropertyNames.TraceParent, TraceParent },
+            { OnTheWireSystemPropertyNames.TraceState, TraceState }
         };
 
         public static readonly Dictionary<string, string> OutgoingSystemPropertiesMap = new Dictionary<string, string>
@@ -67,7 +71,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
             { Operation, OnTheWireSystemPropertyNames.OperationOnTheWireName },
             { CreationTime, OnTheWireSystemPropertyNames.CreationTimeOnTheWireName },
             { ConnectionDeviceId, OnTheWireSystemPropertyNames.ConnectionDeviceIdOnTheWireName },
-            { ConnectionModuleId, OnTheWireSystemPropertyNames.ConnectionModuleIdOnTheWireName }
+            { ConnectionModuleId, OnTheWireSystemPropertyNames.ConnectionModuleIdOnTheWireName },
+            { TraceParent, OnTheWireSystemPropertyNames.TraceParent },
+            { TraceState, OnTheWireSystemPropertyNames.TraceState }
         };
 
         static class OnTheWireSystemPropertyNames
@@ -87,6 +93,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
             public const string CreationTimeOnTheWireName = "$.ctime";
             public const string OperationOnTheWireName = "iothub-operation";
             public const string InterfaceIdOnTheWireName = "$.ifid";
+            public const string TraceParent = "$.traceparent";
+            public const string TraceState = "$.tracestate";
         }
     }
 }

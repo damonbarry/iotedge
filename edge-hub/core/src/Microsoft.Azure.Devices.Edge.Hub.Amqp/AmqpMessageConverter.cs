@@ -64,6 +64,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Amqp
                 systemProperties.AddIfNonEmpty(SystemProperties.InterfaceId, hubInterfaceId);
             }
 
+            if (sourceMessage.MessageAnnotations.Map.TryGetValue(SystemProperties.TraceParent, out string traceParent))
+            {
+                systemProperties.AddIfNonEmpty(SystemProperties.TraceParent, traceParent);
+            }
+
+            if (sourceMessage.MessageAnnotations.Map.TryGetValue(SystemProperties.TraceState, out string traceState))
+            {
+                systemProperties.AddIfNonEmpty(SystemProperties.TraceState, traceState);
+            }
+
             if (sourceMessage.ApplicationProperties != null)
             {
                 foreach (KeyValuePair<MapKey, object> property in sourceMessage.ApplicationProperties.Map)
@@ -178,6 +188,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Amqp
             if (message.SystemProperties.TryGetNonEmptyValue(SystemProperties.ConnectionModuleId, out string connectionModuleId))
             {
                 amqpMessage.MessageAnnotations.Map[Constants.MessageAnnotationsConnectionModuleId] = connectionModuleId;
+            }
+
+            if (message.SystemProperties.TryGetNonEmptyValue(SystemProperties.TraceParent, out string traceParent))
+            {
+                amqpMessage.MessageAnnotations.Map[Constants.MessageAnnotationsTraceParent] = traceParent;
+            }
+
+            if (message.SystemProperties.TryGetNonEmptyValue(SystemProperties.TraceState, out string traceState))
+            {
+                amqpMessage.MessageAnnotations.Map[Constants.MessageAnnotationsTraceState] = traceState;
             }
 
             if (message.SystemProperties.TryGetNonEmptyValue(SystemProperties.MessageSchema, out string messageSchema))
