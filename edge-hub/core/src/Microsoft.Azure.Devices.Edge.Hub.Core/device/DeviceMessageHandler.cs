@@ -12,11 +12,14 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Device
     using Microsoft.Azure.Devices.Edge.Util.Concurrency;
     using Microsoft.Azure.Devices.Edge.Util.Metrics;
     using Microsoft.Extensions.Logging;
+    using OpenTelemetry.Trace;
     using static System.FormattableString;
 
     class DeviceMessageHandler : IDeviceListener, IDeviceProxy
     {
         const int GenericBadRequest = 400000;
+
+        static readonly ActivitySource activitySource = new ActivitySource("Microsoft.Azure.Devices.Edge.Hub", "db20200908.1");
 
         readonly ConcurrentDictionary<string, TaskCompletionSource<DirectMethodResponse>> methodCallTaskCompletionSources = new ConcurrentDictionary<string, TaskCompletionSource<DirectMethodResponse>>();
         readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> messageTaskCompletionSources = new ConcurrentDictionary<string, TaskCompletionSource<bool>>();
@@ -24,16 +27,18 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Device
 
         readonly IEdgeHub edgeHub;
         readonly IConnectionManager connectionManager;
+        readonly TracerProvider tracerProvider;
         readonly TimeSpan messageAckTimeout;
         readonly AsyncLock serializeMessagesLock = new AsyncLock();
         readonly Option<string> modelId;
         IDeviceProxy underlyingProxy;
 
-        public DeviceMessageHandler(IIdentity identity, IEdgeHub edgeHub, IConnectionManager connectionManager, TimeSpan messageAckTimeout, Option<string> modelId)
+        public DeviceMessageHandler(IIdentity identity, IEdgeHub edgeHub, IConnectionManager connectionManager, TracerProvider tracerProvider, TimeSpan messageAckTimeout, Option<string> modelId)
         {
             this.Identity = Preconditions.CheckNotNull(identity, nameof(identity));
             this.edgeHub = Preconditions.CheckNotNull(edgeHub, nameof(edgeHub));
             this.connectionManager = Preconditions.CheckNotNull(connectionManager, nameof(connectionManager));
+            this.tracerProvider = Preconditions.CheckNotNull(tracerProvider, nameof(tracerProvider));
             this.messageAckTimeout = messageAckTimeout;
             this.modelId = modelId;
         }
@@ -196,6 +201,20 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Device
                     message.SystemProperties[SystemProperties.ModelId] = modelId;
                 }
             });
+
+            foreach (IMessage message in messages)
+            {
+                if (message.SystemProperties.TryGetNonEmptyValue(SystemProperties.TraceParent, out string traceParent))
+                {
+                    using Activity activity = activitySource.StartActivity(
+                        "EdgeHubD2CMessageArrived",
+                        ActivityKind.Consumer,
+                        traceParent);
+                    message.SystemProperties[SystemProperties.TraceParent] = activity.Id;
+                    message.SystemProperties[SystemProperties.TraceState] =
+                        $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";
+                }
+            }
 
             return this.edgeHub.ProcessDeviceMessageBatch(this.Identity, messages);
         }
