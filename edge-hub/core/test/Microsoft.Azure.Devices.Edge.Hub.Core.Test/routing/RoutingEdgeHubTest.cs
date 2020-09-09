@@ -283,7 +283,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test.Routing
                 subscriptionProcessor,
                 Mock.Of<IDeviceScopeIdentitiesCache>());
 
-            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, DefaultMessageAckTimeout, Option.None<string>());
+            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, null, DefaultMessageAckTimeout, Option.None<string>());
             var methodRequest = new DirectMethodRequest("device1/module1", "shutdown", null, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(10));
 
             // Act
@@ -365,7 +365,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test.Routing
                 Mock.Of<ISubscriptionProcessor>(),
                 Mock.Of<IDeviceScopeIdentitiesCache>());
 
-            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, DefaultMessageAckTimeout, Option.None<string>());
+            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, null, DefaultMessageAckTimeout, Option.None<string>());
 
             // Act
             deviceMessageHandler.BindDeviceProxy(underlyingDeviceProxy.Object);
@@ -442,7 +442,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test.Routing
                 subscriptionProcessor,
                 Mock.Of<IDeviceScopeIdentitiesCache>());
 
-            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, DefaultMessageAckTimeout, Option.None<string>());
+            var deviceMessageHandler = new DeviceMessageHandler(identity, routingEdgeHub, connectionManager, null, DefaultMessageAckTimeout, Option.None<string>());
             var underlyingDeviceProxy = new Mock<IDeviceProxy>();
 
             // Arrange
