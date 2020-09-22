@@ -22,7 +22,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             var connectionManager = Mock.Of<IConnectionManager>();
             var edgeHub = Mock.Of<IEdgeHub>();
 
-            Assert.NotNull(new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout));
+            Assert.NotNull(new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout, string.Empty));
         }
 
         [Fact]
@@ -31,7 +31,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
         {
             var edgeHub = Mock.Of<IEdgeHub>();
 
-            Assert.Throws<ArgumentNullException>(() => new ConnectionProvider(null, edgeHub, DefaultMessageAckTimeout));
+            Assert.Throws<ArgumentNullException>(() => new ConnectionProvider(null, edgeHub, DefaultMessageAckTimeout, string.Empty));
         }
 
         [Fact]
@@ -40,7 +40,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
         {
             var connectionManager = Mock.Of<IConnectionManager>();
 
-            Assert.Throws<ArgumentNullException>(() => new ConnectionProvider(connectionManager, null, DefaultMessageAckTimeout));
+            Assert.Throws<ArgumentNullException>(() => new ConnectionProvider(connectionManager, null, DefaultMessageAckTimeout, string.Empty));
         }
 
         [Fact]
@@ -51,7 +51,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             var edgeHub = Mock.Of<IEdgeHub>();
             var moduleCredentials = new TokenCredentials(new ModuleIdentity("hub", "device", "module"), "token", "productInfo", false);
 
-            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout);
+            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout, string.Empty);
             Assert.NotNull(await connectionProvider.GetDeviceListenerAsync(moduleCredentials.Identity, Option.None<string>()));
         }
 
@@ -65,7 +65,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             var clientCertChain = new List<X509Certificate2>();
             var moduleCredentials = new X509CertCredentials(new ModuleIdentity("hub", "device", "module"), string.Empty, clientCertificate, clientCertChain);
 
-            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout);
+            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout, string.Empty);
             Assert.NotNull(await connectionProvider.GetDeviceListenerAsync(moduleCredentials.Identity, Option.None<string>()));
         }
 
@@ -76,7 +76,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             var connectionManager = Mock.Of<IConnectionManager>();
             var edgeHub = Mock.Of<IEdgeHub>();
 
-            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout);
+            var connectionProvider = new ConnectionProvider(connectionManager, edgeHub, DefaultMessageAckTimeout, string.Empty);
             await Assert.ThrowsAsync<ArgumentNullException>(() => connectionProvider.GetDeviceListenerAsync(null, Option.None<string>()));
         }
     }
