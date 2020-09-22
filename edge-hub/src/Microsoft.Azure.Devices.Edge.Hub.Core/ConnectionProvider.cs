@@ -14,17 +14,26 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
         readonly IConnectionManager connectionManager;
         readonly IEdgeHub edgeHub;
         readonly TimeSpan messageAckTimeout;
-
         readonly TracerProvider tracerProvider;
 
-        public ConnectionProvider(IConnectionManager connectionManager, IEdgeHub edgeHub, TimeSpan messageAckTimeout)
+        public ConnectionProvider(
+            IConnectionManager connectionManager,
+            IEdgeHub edgeHub,
+            TimeSpan messageAckTimeout,
+            string traceEndpoint)
         {
             this.connectionManager = Preconditions.CheckNotNull(connectionManager, nameof(connectionManager));
             this.edgeHub = Preconditions.CheckNotNull(edgeHub, nameof(edgeHub));
             this.messageAckTimeout = messageAckTimeout;
             this.tracerProvider = Sdk.CreateTracerProviderBuilder()
                 .AddSource("Microsoft.Azure.Devices.Edge.Hub")
-                .AddOtlpExporter()
+                .AddOtlpExporter(opt =>
+                {
+                    if (!string.IsNullOrWhiteSpace(traceEndpoint))
+                    {
+                        opt.Endpoint = traceEndpoint;
+                    }
+                })
                 .Build();
         }
 

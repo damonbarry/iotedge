@@ -155,6 +155,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             TimeSpan configUpdateFrequency = TimeSpan.FromSeconds(configUpdateFrequencySecs);
             bool checkEntireQueueOnCleanup = this.configuration.GetValue("CheckEntireQueueOnCleanup", false);
             bool closeCloudConnectionOnDeviceDisconnect = this.configuration.GetValue("CloseCloudConnectionOnDeviceDisconnect", true);
+            string traceEndpoint = this.configuration.GetValue("TraceEndpoint", string.Empty);
 
             builder.RegisterModule(
                 new RoutingModule(
@@ -185,7 +186,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                     configUpdateFrequency,
                     checkEntireQueueOnCleanup,
                     experimentalFeatures,
-                    closeCloudConnectionOnDeviceDisconnect));
+                    closeCloudConnectionOnDeviceDisconnect,
+                    traceEndpoint));
         }
 
         void RegisterCommonModule(

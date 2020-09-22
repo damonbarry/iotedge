@@ -55,6 +55,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
         readonly bool checkEntireQueueOnCleanup;
         readonly ExperimentalFeatures experimentalFeatures;
         readonly bool closeCloudConnectionOnDeviceDisconnect;
+        readonly string traceEndpoint;
 
         public RoutingModule(
             string iotHubName,
@@ -84,7 +85,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             TimeSpan configUpdateFrequency,
             bool checkEntireQueueOnCleanup,
             ExperimentalFeatures experimentalFeatures,
-            bool closeCloudConnectionOnDeviceDisconnect)
+            bool closeCloudConnectionOnDeviceDisconnect,
+            string traceEndpoint)
         {
             this.iotHubName = Preconditions.CheckNonWhiteSpace(iotHubName, nameof(iotHubName));
             this.edgeDeviceId = Preconditions.CheckNonWhiteSpace(edgeDeviceId, nameof(edgeDeviceId));
@@ -114,6 +116,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             this.checkEntireQueueOnCleanup = checkEntireQueueOnCleanup;
             this.experimentalFeatures = experimentalFeatures;
             this.closeCloudConnectionOnDeviceDisconnect = closeCloudConnectionOnDeviceDisconnect;
+            this.traceEndpoint = traceEndpoint;
         }
 
         protected override void Load(ContainerBuilder builder)
@@ -583,7 +586,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                         var edgeHubTask = c.Resolve<Task<IEdgeHub>>();
                         IConnectionManager connectionManager = await connectionManagerTask;
                         IEdgeHub edgeHub = await edgeHubTask;
-                        IConnectionProvider connectionProvider = new ConnectionProvider(connectionManager, edgeHub, this.messageAckTimeout);
+                        IConnectionProvider connectionProvider = new ConnectionProvider(connectionManager, edgeHub, this.messageAckTimeout, this.traceEndpoint);
                         return connectionProvider;
                     })
                 .As<Task<IConnectionProvider>>()
