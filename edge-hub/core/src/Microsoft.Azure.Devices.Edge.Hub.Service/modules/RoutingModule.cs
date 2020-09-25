@@ -210,7 +210,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             builder.Register(
                     c =>
                     {
-                        IClientProvider underlyingClientProvider = new ClientProvider(this.gatewayHostname);
+                        IClientProvider underlyingClientProvider = new ClientProvider(this.gatewayHostname, this.traceEndpoint);
                         IClientProvider connectivityAwareClientProvider = new ConnectivityAwareClientProvider(underlyingClientProvider, c.Resolve<IDeviceConnectivityManager>());
                         return connectivityAwareClientProvider;
                     })

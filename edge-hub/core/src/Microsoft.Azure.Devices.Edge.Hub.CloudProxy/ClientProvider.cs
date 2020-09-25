@@ -11,10 +11,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
     public class ClientProvider : IClientProvider
     {
         readonly Option<string> gatewayHostname;
+        readonly string traceEndpoint;
 
-        public ClientProvider(Option<string> gatewayHostname)
+        public ClientProvider(Option<string> gatewayHostname, string traceEndpoint)
         {
             this.gatewayHostname = gatewayHostname;
+            this.traceEndpoint = traceEndpoint;
         }
 
         public IClient Create(IIdentity identity, IAuthenticationMethod authenticationMethod, ITransportSettings[] transportSettings, Option<string> modelId)
@@ -43,7 +45,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
                             o => ModuleClient.Create(identity.IotHubHostname, authenticationMethod, transportSettings, o),
                             () => ModuleClient.Create(identity.IotHubHostname, authenticationMethod, transportSettings));
                     });
-                return new ModuleClientWrapper(moduleClient);
+                return new ModuleClientWrapper(moduleClient, this.traceEndpoint);
             }
             else if (identity is IDeviceIdentity)
             {
@@ -75,7 +77,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             if (identity is IModuleIdentity)
             {
                 ModuleClient moduleClient = ModuleClient.CreateFromConnectionString(connectionString, transportSettings);
-                return new ModuleClientWrapper(moduleClient);
+                return new ModuleClientWrapper(moduleClient, this.traceEndpoint);
             }
             else if (identity is IDeviceIdentity)
             {
@@ -97,7 +99,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             }
 
             ModuleClient moduleClient = await ModuleClient.CreateFromEnvironmentAsync(transportSettings);
-            return new ModuleClientWrapper(moduleClient);
+            return new ModuleClientWrapper(moduleClient, this.traceEndpoint);
         }
 
         public IClient Create(IIdentity identity, ITokenProvider tokenProvider, ITransportSettings[] transportSettings, Option<string> modelId)

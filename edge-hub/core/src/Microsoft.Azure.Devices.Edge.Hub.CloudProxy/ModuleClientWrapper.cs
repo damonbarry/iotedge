@@ -3,6 +3,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Client;
     using Microsoft.Azure.Devices.Edge.Util;
@@ -11,13 +13,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
 
     class ModuleClientWrapper : IClient
     {
+        static readonly ActivitySource activitySource = new ActivitySource("Microsoft.Azure.Devices.Edge.Hub", "db20200908.1");
         readonly ModuleClient underlyingModuleClient;
         readonly AtomicBoolean isActive;
+        readonly string traceEndpoint;
 
-        public ModuleClientWrapper(ModuleClient moduleClient)
+        public ModuleClientWrapper(ModuleClient moduleClient, string traceEndpoint)
         {
             this.underlyingModuleClient = moduleClient;
             this.isActive = new AtomicBoolean(true);
+            this.traceEndpoint = traceEndpoint;
         }
 
         public bool IsActive => this.isActive;
@@ -62,9 +67,45 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             }
         }
 
-        public Task SendEventAsync(Message message) => this.underlyingModuleClient.SendEventAsync(message);
+        public Task SendEventAsync(Message message)
+        {
+            using (Activity activity = activitySource.StartActivity(
+                "EdgeHubD2CMessageDeliveredUpstream", ActivityKind.Producer, message.TraceParent))
+            {
+                message.TraceParent = activity.Id;
+                message.TraceState = $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";
+                return this.underlyingModuleClient.SendEventAsync(message);
+            }
+        }
 
-        public Task SendEventBatchAsync(IEnumerable<Message> messages) => this.underlyingModuleClient.SendEventBatchAsync(messages);
+        public Task SendEventBatchAsync(IEnumerable<Message> messages)
+        {
+            Message[] inputMessages = messages.ToArray();
+            if (inputMessages.Length == 1)
+            {
+                return this.SendEventAsync(inputMessages[0]);
+            }
+
+            var links = new List<ActivityLink>();
+            foreach (Message message in inputMessages)
+            {
+                if (!string.IsNullOrEmpty(message.TraceParent))
+                {
+                    using (Activity activity = activitySource.StartActivity(
+                        "whatever", ActivityKind.Internal, message.TraceParent))
+                    {
+                        links.Add(new ActivityLink(activity.Context));
+                        message.TraceState = $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";
+                    }
+                }
+            }
+
+            using (Activity activity = activitySource.StartActivity(
+                "EdgeHubD2CMessageDeliveredUpstream", ActivityKind.Producer, default(ActivityContext), null, links))
+            {
+                return this.underlyingModuleClient.SendEventBatchAsync(messages);
+            }
+        }
 
         public void SetConnectionStatusChangedHandler(ConnectionStatusChangesHandler handler) => this.underlyingModuleClient.SetConnectionStatusChangesHandler(handler);
 
