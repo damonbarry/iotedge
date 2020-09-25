@@ -209,7 +209,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Device
                 {
                     using Activity activity = activitySource.StartActivity(
                         "EdgeHubD2CMessageArrived",
-                        ActivityKind.Consumer,
+                        ActivityKind.Producer,
                         traceParent);
                     message.SystemProperties[SystemProperties.TraceParent] = activity.Id;
                     message.SystemProperties[SystemProperties.TraceState] =
