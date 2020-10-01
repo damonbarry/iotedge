@@ -209,8 +209,10 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Device
                 {
                     using Activity activity = activitySource.StartActivity(
                         "EdgeHubD2CMessageArrived",
-                        ActivityKind.Producer,
+                        ActivityKind.Consumer,
                         traceParent);
+                    activity.AddTag("deviceId", Environment.GetEnvironmentVariable("IOTEDGE_DEVICEID") ?? string.Empty);
+                    activity.AddTag("moduleId", Environment.GetEnvironmentVariable("IOTEDGE_MODULEID") ?? string.Empty);
                     message.SystemProperties[SystemProperties.TraceParent] = activity.Id;
                     message.SystemProperties[SystemProperties.TraceState] =
                         $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";

@@ -72,6 +72,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             using (Activity activity = activitySource.StartActivity(
                 "EdgeHubD2CMessageDeliveredUpstream", ActivityKind.Producer, message.TraceParent))
             {
+                activity.AddTag("deviceId", Environment.GetEnvironmentVariable("IOTEDGE_DEVICEID") ?? string.Empty);
+                activity.AddTag("moduleId", Environment.GetEnvironmentVariable("IOTEDGE_MODULEID") ?? string.Empty);
                 message.TraceParent = activity.Id;
                 message.TraceState = $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";
                 return this.underlyingModuleClient.SendEventAsync(message);
@@ -92,9 +94,10 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
                 if (!string.IsNullOrEmpty(message.TraceParent))
                 {
                     using (Activity activity = activitySource.StartActivity(
-                        "whatever", ActivityKind.Internal, message.TraceParent))
+                        "EdgeHubD2CMessageSendBatch", ActivityKind.Consumer, message.TraceParent))
                     {
                         links.Add(new ActivityLink(activity.Context));
+                        message.TraceParent = activity.Id;
                         message.TraceState = $"timestamp={(int)DateTimeOffset.Now.ToUnixTimeSeconds()}";
                     }
                 }
@@ -103,6 +106,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy
             using (Activity activity = activitySource.StartActivity(
                 "EdgeHubD2CMessageDeliveredUpstream", ActivityKind.Producer, default(ActivityContext), null, links))
             {
+                activity.AddTag("deviceId", Environment.GetEnvironmentVariable("IOTEDGE_DEVICEID") ?? string.Empty);
+                activity.AddTag("moduleId", Environment.GetEnvironmentVariable("IOTEDGE_MODULEID") ?? string.Empty);
                 return this.underlyingModuleClient.SendEventBatchAsync(messages);
             }
         }
