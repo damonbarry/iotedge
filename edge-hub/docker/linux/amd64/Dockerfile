@@ -16,7 +16,7 @@ RUN apk update && \
 # See https://github.com/grpc/grpc/issues/21446#issuecomment-572305508
 RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.8/main' >> /etc/apk/repositories && \
     apk update --no-cache && \
-    apk add --no-cache bash libc6-compat=1.1.19-r11
+    apk add --no-cache libc6-compat=1.1.19-r11
 
 # Add an unprivileged user account for running Edge Hub	
 ARG EDGEHUBUSER_ID=1000	
