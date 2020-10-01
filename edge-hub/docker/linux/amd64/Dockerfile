@@ -11,6 +11,13 @@ ADD ./mqttd/broker.json /app/mqttd/broker.json
 RUN apk update && \	
     apk add --no-cache snappy libcap	
 
+# Downgrade libc6-compat to 1.19, otherwise grpc (which OpenTelemetry library
+# relies on) has problems in musl environment
+# See https://github.com/grpc/grpc/issues/21446#issuecomment-572305508
+RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.8/main' >> /etc/apk/repositories && \
+    apk update --no-cache && \
+    apk add --no-cache bash libc6-compat=1.1.19-r11
+
 # Add an unprivileged user account for running Edge Hub	
 ARG EDGEHUBUSER_ID=1000	
 RUN adduser -Ds /bin/sh -u ${EDGEHUBUSER_ID} edgehubuser 	
