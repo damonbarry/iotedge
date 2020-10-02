@@ -318,7 +318,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy.Test
             ICloudConnectionProvider cloudConnectionProvider = new CloudConnectionProvider(
                 converters,
                 ConnectionPoolSize,
-                new ClientProvider(Option.None<string>()),
+                new ClientProvider(Option.None<string>(), string.Empty),
                 Option.None<UpstreamProtocol>(),
                 Mock.Of<Util.ITokenProvider>(),
                 Mock.Of<IDeviceScopeIdentitiesCache>(),
