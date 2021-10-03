@@ -33,7 +33,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Windows
                     properties = properties.Append(p).ToArray();
                 });
 
-            string installCommand = $"Install-IoTEdge -ContainerOs Windows -Manual -DeviceConnectionString 'tbd'";
+            string installCommand = $"Install-IoTEdge -ContainerOs Windows -SkipBatteryCheck -Manual -DeviceConnectionString 'tbd'";
             packagesPath.ForEach(p => installCommand += $" -OfflineInstallationPath '{p}'");
             proxy.ForEach(
                 p => installCommand += $" -InvokeWebRequestParameters @{{ '-Proxy' = '{p}' }}");
