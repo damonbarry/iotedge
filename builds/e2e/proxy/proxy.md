@@ -1,9 +1,11 @@
-This file documents how to set up a proxy environment in Azure for our E2E tests.
+This file documents how to add agent VMs to an existing proxy environment for end-to-end tests.
 
-The environment includes:
+These steps assume that the environment already includes:
 - A proxy server VM - full network connectivity, runs an HTTP proxy server (squid).
+- A Key Vault that contains the private keys used to SSH into any existing VMs.
+- The virtual network and network security group to which the new agent VMs will belong.
+These steps will add to the environment:
 - One or more proxy client VMs (aka "runners") - no internet-bound network connectivity except through the proxy server.
-- A Key Vault that contains the private keys used to SSH into the VMs.
 
 After installing the Azure CLI, enter the following commands to deploy and configure the VMs:
 
@@ -16,20 +18,15 @@ cd builds/e2e/proxy/
 # Name of Azure subscription
 subscription_name='<>'
 
-# Location of the resource group
-location='<>'
-
 # Name of the resource group
 resource_group_name='<>'
 
 # Prefix used when creating Azure resources. If not given, defaults to 'e2e-<13 char hash>-'.
 resource_prefix='<>'
 
-# The number of runner VMs to create
+# Add, e.g., 2 more runners, prx-runner3-vm and prx-runner4-vm
+runner_start=3
 runner_count=2
-
-# AAD Object ID for a user or group who will be given access to the secrets in the key vault
-key_vault_access_objectid='<>'
 
 # -------
 # Execute
@@ -38,19 +35,16 @@ key_vault_access_objectid='<>'
 az login
 az account set -s "$subscription_name"
 
-# If the resource group doesn't already exist, create it
-az group create -l "$location" -n "$resource_group_name"
-
 # Deploy the VMs
-az deployment group create --resource-group "$resource_group_name" --name 'e2e-proxy' --template-file ./proxy-deployment-template.json --parameters "$(
+az deployment group create --resource-group $resource_group_name --name 'add-runners' --template-file ./proxy-deployment-template.json --parameters "$(
     jq -n \
         --arg resource_prefix $resource_prefix \
+        --argjson runner_start $runner_start \
         --argjson runner_count $runner_count \
-        --arg key_vault_access_objectid "$key_vault_access_objectid" \
         '{
             "resource_prefix": { "value": $resource_prefix },
+            "runner_start": { "value": $runner_start },
             "runner_count": { "value": $runner_count },
-            "key_vault_access_objectid": { "value": $key_vault_access_objectid },
             "create_runner_public_ip": { "value": true }
         }'
 )"
