@@ -26,6 +26,12 @@
       See https://github.com/dotnet/runtime/issues/49377#issuecomment-804930299.
     -->
     <PackageReference Include="System.Text.Encodings.Web" Version="4.5.1" />
+    <!--
+      prometheus-net.AspNetCore takes a transitive dependency on
+      Microsoft.AspNetCore.Server.Kestrel.Core. Use an explicit reference here to
+      override the version and fix a security vulnerability.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Core" Version="2.1.7" />
 
     <ProjectReference Include="..\Microsoft.Azure.Devices.Edge.Util\Microsoft.Azure.Devices.Edge.Util.csproj" />
   </ItemGroup>
