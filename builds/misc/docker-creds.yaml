@@ -1,0 +1,72 @@
+trigger: none
+pr: none
+
+variables:
+  DisableDockerDetector: true
+
+- task: Docker@2
+  displayName: Docker login
+  inputs:
+    command: login
+    containerRegistry: damonbacr
+
+- script: |
+    #!/bin/bash
+    set -xeuo pipefail
+
+    registry='damonbacr.azurecr.io'
+    repository='microsoft/azureiotedge-simulated-temperature-sensor'
+    reference='0.1.2-dlb-linux-amd64'
+
+    # Request authorization service
+    result=$(curl --head --write-out '\n%{http_code}' \
+      "https://$registry/v2/$repository/manifests/$reference")
+
+    if [[ "$(echo "$result" | tail -n 1)" != 401 ]]; then
+      echo 'Expected 401 Unauthorized'
+      exit 1
+    fi
+
+    # Parse bearer challenge from header
+    search='WWW-Authenticate: Bearer '
+    auth_header=$(echo "$result" | grep -i "$search" | sed -e 's/[[:space:]]*$//')
+    IFS=',' auth_info=($(echo "${auth_header:${#search}}"))
+    # TODO: Handle challenges spread across multiple WWW-Authenticate headers?
+    # TODO: Validate challenge parameters instead of blindly sourcing them?
+    source <(echo "${auth_info[@]}")
+
+    # Get credentials from Docker config
+    cred=$(cat $HOME/.docker/config.json |
+      jq -r '.auths."damonbacr.azurecr.io".auth' |
+      base64 --decode)
+
+    # Request bearer token from authorization service
+    result=$(curl --user "$cred" --write-out '\n%{http_code}' \
+      "$realm?service=$service&scope=$scope")
+
+    if [[ "$(echo "$result" | tail -n 1)" != 200 ]]; then
+      echo 'Expected 200 OK'
+      exit 1
+    fi
+
+    # Parse bearer token from response
+    token=$(echo "$result" | head -n 1 | jq -r '.access_token')
+
+    # Use bearer token to check whether image exists
+    result=$(curl \
+      --head \
+      --header 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+      --header "Authorization: Bearer $token" \
+      --write-out '\n%{http_code}' \
+      "https://$registry/v2/$repository/manifests/$reference")
+
+    # Does image exist?
+    status=$(echo "$result" | tail -n 1)
+    if [[ "$status" == 200 ]]; then
+      echo "Image '$registry/$repository:$reference' exists"
+    elif [[ "$status" == 404 ]]; then
+      echo "Image '$registry/$repository:$reference' does NOT exist"
+    else
+      echo "Request to check existence of image '$registry/$repository:$reference' returned $status"
+    fi
+  displayName: Do something with Docker
