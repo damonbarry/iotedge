@@ -16,7 +16,7 @@ steps:
 
 - script: |
     #!/bin/bash
-    set -xeuo pipefail
+    set -euo pipefail
 
     registry='damonbacr.azurecr.io'
     repository='microsoft/azureiotedge-simulated-temperature-sensor'
@@ -39,12 +39,8 @@ steps:
     # TODO: Validate challenge parameters instead of blindly sourcing them?
     source <(echo "${auth_info[@]}")
     
-    docker_config="$DOCKER_CONFIG/config.json"
-
-    [[ -f "$docker_config" ]] || echo "config.json doesn't exist!!"
-    ls -al "$docker_config"
-
     # Get credentials from Docker config
+    docker_config="$DOCKER_CONFIG/config.json"
     cred=$(cat "$docker_config" |
       jq -r '.auths."damonbacr.azurecr.io".auth' |
       base64 --decode)
