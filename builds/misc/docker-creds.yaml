@@ -38,12 +38,14 @@ steps:
     # TODO: Handle challenges spread across multiple WWW-Authenticate headers?
     # TODO: Validate challenge parameters instead of blindly sourcing them?
     source <(echo "${auth_info[@]}")
+    
+    docker_config="$DOCKER_CONFIG/config.json"
 
-    [[ -f "$HOME/.docker/config.json" ]] || echo "config.json doesn't exist!!"
-    ls -al $HOME/.docker/config.json
+    [[ -f "$docker_config" ]] || echo "config.json doesn't exist!!"
+    ls -al "$docker_config"
 
     # Get credentials from Docker config
-    cred=$(cat $HOME/.docker/config.json |
+    cred=$(cat "$docker_config" |
       jq -r '.auths."damonbacr.azurecr.io".auth' |
       base64 --decode)
 
