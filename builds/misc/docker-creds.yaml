@@ -39,6 +39,9 @@ steps:
     # TODO: Validate challenge parameters instead of blindly sourcing them?
     source <(echo "${auth_info[@]}")
 
+    [[ -f "$HOME/.docker/config.json" ]] || echo 'config.json doesn't exist!!'
+    ls -al $HOME/.docker/config.json
+
     # Get credentials from Docker config
     cred=$(cat $HOME/.docker/config.json |
       jq -r '.auths."damonbacr.azurecr.io".auth' |
