@@ -42,7 +42,7 @@ steps:
     # Get credentials from Docker config
     docker_config="$DOCKER_CONFIG/config.json"
     cred=$(cat "$docker_config" |
-      jq --arg registry "$registry" -r '.auths | .[$registry].auth |'
+      jq --arg registry "$registry" -r '.auths | .[$registry].auth' |
       base64 --decode)
 
     # Request bearer token from authorization service
