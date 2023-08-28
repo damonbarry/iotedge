@@ -60,7 +60,11 @@ get_nearest_version() {
   echo "${version/$tag_prefix/}"
 }
 
-# don't indent the body of this function
+# WARNING: DON'T INDENT THE BODY OF THIS FUNCTION!
+# Parameters
+#   $1    Core images version
+#   $2    Diagnostics image version
+#   $3    Path to changelog
 make_core_changelog() {
 local prod_version="$1"
 local diag_version="$2"
@@ -88,6 +92,20 @@ cat <<- EOF > "$2"
 
 The following Docker images were updated because their base images changed:
 * azureiotedge-metrics-collector
+
+EOF
+}
+
+# WARNING: DON'T INDENT THE BODY OF THIS FUNCTION!
+# Parameters
+#   $1    API proxy version
+#   $2    Path to changelog
+make_api_proxy_changelog() {
+cat <<- EOF > "$2"
+# $1 ($(date --iso-8601=date))
+
+The following Docker images were updated because their base images changed:
+* azureiotedge-api-proxy
 
 EOF
 }
@@ -129,7 +147,6 @@ make_project_release_commit_for_core_image_refresh() {
   # determine new version
   IFS='.' read -a parts <<< "$prev"
   local next="${parts[0]}.${parts[1]}.$((${parts[2]} + 1))"
-  local tags="[\"${parts[0]}.${parts[1]}\"]"
 
   # determine version of diagnostics image, which must match the edgelet version
   local diag_version=$(
@@ -202,7 +219,6 @@ make_project_release_commit_for_metrics_collector_image_refresh() {
   # determine new version
   IFS='.' read -a parts <<< "$prev"
   local next="${parts[0]}.${parts[1]}.$((${parts[2]} + 1))"
-  local tags="[\"${parts[0]}.${parts[1]}\"]"
 
   # update changelog
   make_metrics_collector_changelog "$next" 'CHANGELOG.new.md'
@@ -229,6 +245,55 @@ make_project_release_commit_for_metrics_collector_image_refresh() {
   git checkout "refs/remotes/$remote/$branch"
   git merge "$git_tag" -m "Merge tag '$git_tag' into $branch"
   git push "$remote_url" "HEAD:$branch"
+}
+
+#
+# Creates a release commit appropriate for refreshing the API proxy images when their base images
+# have been updated. It ensures there is *no change* to API proxy image code by creating the new
+# release commit directly off the previously tagged release commit, even if there are newer commits
+# in the branch.
+#
+#         (E)------+
+#         /         \
+#    A---B---C---D--(F)
+#
+# If the last release was tagged at commit B, and two unreleased commits have been added since (C
+# and D), this function creates commit E from B, then merges it to create F. As a result, E becomes
+# the latest tagged release commit and the release does not include the changes in C or D. The only
+# difference between the Docker images produced from B and the Docker images produced from E are the
+# base images they're built upon. Also, because this is intended for an images-only release, this
+# function does not update the edgelet version file.
+#
+# Globals
+#   GIT_EMAIL    Optional. If not given, will assume git is already configured
+#   GITHUB_TOKEN Optional. If not given, will assume you have push rights to the repo
+#   REMOTE       Optional. If not given, defaults to 'origin'
+#   BRANCH       Optional. If not given, defaults to current branch (e.g., 'release/1.4')
+#
+# Output
+#   None
+#
+make_project_release_commit_for_api_proxy_image_refresh() {
+  local remote=${REMOTE:-origin}
+  local branch=${BRANCH:-$(git branch --show-current)}
+  local git_tag_prefix='api-proxy-'
+
+  # checkout code at current release version
+  local prev=$(TAG_PREFIX="$git_tag_prefix" get_nearest_version)
+  git checkout "${git_tag_prefix}${prev}"
+
+  # determine new version
+  IFS='.' read -a parts <<< "$prev"
+  local next="${parts[0]}.${parts[1]}.$((${parts[2]} + 1))"
+
+  configure_git_user
+
+  local remote_url=$(get_push_url)
+  local git_tag="${git_tag_prefix}${next}"
+
+  # push new release tag
+  git tag "$git_tag"
+  git push "$remote_url" "$git_tag"
 }
 
 #
@@ -318,6 +383,59 @@ get_metrics_collector_release_info() {
   # get the changelog for the new release
   local tmpfile=$(mktemp)
   echo "$(sed -n "/# $next/,/# $prev/p" edge-modules/metrics-collector/CHANGELOG.md)" > "$tmpfile"
+  sed -i "$ d" "$tmpfile" # remove last line
+
+  # Azure Pipelines doesn't seem to handle multi-line task variables, so encode to one line
+  # See https://developercommunity.visualstudio.com/t/multiple-lines-variable-in-build-and-release/365667
+  readarray -t lines < <(cat "$tmpfile")
+  local changelog=$(printf '\\x0A%s' "${lines[@]//$'\r'}")
+  local changelog=${changelog:4} # Remove leading newline
+
+  rm "$tmpfile"
+
+  OUTPUTS=$(jq -nc \
+    --arg changelog "$changelog" \
+    --arg next "$next" \
+    --arg prev "$prev" \
+    --argjson tags "$docker_tags" '
+    {
+      changelog: $changelog,
+      version: $next,
+      previous_version: $prev,
+      tags: $tags
+    }')
+}
+
+#
+# Assuming a release commit for API proxy image refresh has been created and tagged, this function
+# gathers information about the release.
+#
+# Output
+#   OUTPUTS      A variable containing a JSON document:
+#                {
+#                  "changelog": "This is the text of the changelog for the latest version, with
+#                hex-escaped newlines\\x0A. You can easily deserialize it in bash with
+#                'printf -v var $changelog'.\\x0A.",
+#                  "version": "1.1.4",
+#                  "previous_version": "1.1.3",
+#                  "tags": ["1.1"]
+#                }
+#
+get_api_proxy_release_info() {
+  local git_tag_prefix='api-proxy-'
+
+  # get the new version and the previous version
+  local next=$(TAG_PREFIX="$git_tag_prefix" get_nearest_version)
+  local prev=$(TAG_PREFIX="$git_tag_prefix" COMMIT="${git_tag_prefix}${next}~" get_nearest_version)
+
+  # determine docker tags
+  IFS='.' read -a parts <<< "$next"
+  local docker_tags="[\"${parts[0]}.${parts[1]}\"]"
+
+  # get the changelog for the new release
+  local tmpfile=$(mktemp)
+  make_api_proxy_changelog "$next" "$tmpfile"
+  echo "$(sed -n "/# $next/,/# $prev/p" "$tmpfile")" > "$tmpfile"
   sed -i "$ d" "$tmpfile" # remove last line
 
   # Azure Pipelines doesn't seem to handle multi-line task variables, so encode to one line
