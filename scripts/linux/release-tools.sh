@@ -651,3 +651,57 @@ create_github_release_page_for_metrics_collector_in_project_repo() {
     exit 1
   fi
 }
+
+#
+# Uses the GitHub API to create a GitHub Release page in the *project* repo for a release that only
+# refreshes our API Proxy Docker images when their base images have been updated (i.e., no code
+# changes in our project repo). Returns an error status code if the required environment variables
+# are empty, or if GitHub returns an error.
+#
+# Globals
+#   COMMITISH    Optional. If not given, defaults to current branch (e.g., 'release/1.4')
+#   CHANGELOG    Required. Changelog text to add to the Release page.
+#   VERSION      Required. Version of API Proxy module for this release
+#   GITHUB_TOKEN Required. The Authorization token passed to GitHub
+#   REPO_NAME    Required. The GitHub project repository, as 'org/repo'
+#
+# Output
+#   None
+#
+create_github_release_page_for_api_proxy_in_project_repo() {
+  if [[ -z "$CHANGELOG" || -z "$VERSION" || -z "$GITHUB_TOKEN" || -z "$REPO_NAME" ]]; then
+    echo 'Error: One or more required arguments are empty'
+    return 1
+  fi
+
+  local commitish=${COMMITISH:-$(git branch --show-current)}
+  local body="$CHANGELOG"
+
+  local data=$(jq -nc --arg version "$VERSION" --arg commitish "$commitish" --arg body "$body" '
+    {
+      tag_name: "api-proxy-\($version)",
+      name: "API Proxy \($version)",
+      target_commitish: $commitish,
+      body: $body,
+      make_latest: "false"
+    }
+  ')
+
+  local response=$(curl \
+    -sS \
+    -X POST \
+    -w "%{http_code}" \
+    -H 'Accept:application/vnd.github.v3+json' \
+    -H "Authorization:token $GITHUB_TOKEN" \
+    -d "$data" \
+    "https://api.github.com/repos/$REPO_NAME/releases")
+
+  local code=$(echo "$response" | tail -n 1)
+  echo "Response from GitHub:"
+  echo "$response" | head -n -1
+
+  if [ $code -ge 300 ]; then
+    echo "Error: GitHub responded with status code: $code"
+    exit 1
+  fi
+}

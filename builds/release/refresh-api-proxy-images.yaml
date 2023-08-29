@@ -229,8 +229,45 @@ stages:
           --bin-dir '$(Build.BinariesDirectory)'
       displayName: Build API Proxy - $(arch)
 
-    # TODO: ---CONTINUE FROM HERE---
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.BinariesDirectory)/publish'
+        artifactName: $(arch)
+        storeAsTar: true
 
+  - job: BuildImages
+    displayName: Build Docker Images
+    dependsOn: BuildExecutables
+
+    - task: DownloadBuildArtifacts@0
+      displayName: Download Executables
+      inputs:
+        buildType: 'current'
+        downloadPath: '$(Build.ArtifactStagingDirectory)'
+        downloadType: specific
+        extractTars: true
+
+    - task: CopyFiles@2
+      displayName: Copy Executables - amd64
+      inputs:
+        sourceFolder: '$(Agent.TempDirectory)/extracted_tars/x86_64'
+        contents: '**'
+        targetFolder: '$(Build.BinariesDirectory)/publish'       
+
+    - task: CopyFiles@2
+      displayName: Copy Executables - arm32
+      inputs:
+        sourceFolder: '$(Agent.TempDirectory)/extracted_tars/armv7l'
+        contents: '**'
+        targetFolder: '$(Build.BinariesDirectory)/publish'    
+
+    - task: CopyFiles@2
+      displayName: Copy Executables - arm64
+      inputs:
+        sourceFolder: '$(Agent.TempDirectory)/extracted_tars/aarch64'
+        contents: '**'
+        targetFolder: '$(Build.BinariesDirectory)/publish'
+        
     - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
       displayName: Generate SBOM
       inputs:
@@ -238,18 +275,21 @@ stages:
 
     - template: ../misc/templates/image-linux.yaml
       parameters:
-        displayName: Metrics Collector
-        name: azureiotedge-metrics-collector
-        app: Microsoft.Azure.Devices.Edge.Azure.Monitor
+        displayName: API Proxy
+        name: azureiotedge-api-proxy
+        app: api-proxy-module
         version: $(version)
         download_artifacts: false
+
+    - task: ComponentGovernanceComponentDetection@0
+      inputs:
+        dockerImagesToScan: '$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-amd64,$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-arm32v7,$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-arm64v8'
 
 ################################################################################
 - stage: Test
 ################################################################################
-  displayName: Test Metrics Collector
+  displayName: Test API Proxy
   condition: succeeded('Build')
-
   dependsOn:
   - PrepareRelease
   - Build
@@ -272,9 +312,9 @@ stages:
       matrix:
         arm32v7:
           pool: $(pool.linux.arm.name)
-          # Since this pipeline is about testing the Metrics Collector Docker image for release
-          # and not our host components, we'll run the arm32v7 Docker image on an arm64v8 host
-          # OS, with arm64v8 host components, for speed and convenience.
+          # Since this pipeline is about testing the API Proxy Docker image for release and not our
+          # host components, we'll run the arm32v7 Docker image on an arm64v8 host OS, with arm64v8
+          # host components, for speed and convenience.
           agent: agent-aziotedge-ubuntu-20.04-arm64-docker
           arch: arm32v7
         arm64v8:
@@ -439,9 +479,8 @@ stages:
 ################################################################################
 - stage: Publish
 ################################################################################
-  displayName: Publish Metrics Collector
+  displayName: Publish API Proxy
   condition: succeeded('Test')
-
   dependsOn:
   - PrepareRelease
   - Test
@@ -482,11 +521,11 @@ stages:
     - script: |
         scripts/linux/copy-multi-platform-image.sh \
           --registry '$(registry.address)' \
-          --repo-src 'microsoft/azureiotedge-metrics-collector' \
-          --repo-dst 'public/azureiotedge-metrics-collector' \
+          --repo-src 'microsoft/azureiotedge-api-proxy' \
+          --repo-dst 'public/azureiotedge-api-proxy' \
           --tag '$(version)' \
           --tags-add '$(tags)'
-      displayName: Publish Metrics Collector images
+      displayName: Publish API Proxy images
       workingDirectory: iotedge
 
     - task: AzureKeyVault@1
@@ -509,7 +548,7 @@ stages:
         CHANGELOG="$(echo "$CHANGELOG" | tail -n +2 -)"
 
         . scripts/linux/release-tools.sh
-        create_github_release_page_for_metrics_collector_in_project_repo
+        create_github_release_page_for_api_proxy_in_project_repo
       displayName: Create GitHub release page in project repo
       env:
         VERSION: $(version)
@@ -528,12 +567,12 @@ stages:
         # update product-versions.json
         echo "$(jq '
           def product: .channels[] | .products[] | select(
-            .id=="metrics-collector" and .version=="$(version.previous)"
+            .id=="api-proxy" and .version=="$(version.previous)"
           );
-          def metrics_collector: product | .components[] | select(
-            .name=="azureiotedge-metrics-collector"
+          def api_proxy: product | .components[] | select(
+            .name=="azureiotedge-api-proxy"
           );
-          (metrics_collector).version |= "$(version)"
+          (api_proxy).version |= "$(version)"
             | (product).version |= "$(version)"
         ' product-versions.json )" > product-versions.json
         git add product-versions.json
@@ -545,7 +584,7 @@ stages:
         origin_url="${origin_url/#https:\/\//https:\/\/$GITHUB_TOKEN@}" # add token to URL
 
         # commit changes and push
-        git commit -m 'Bump Metrics Collector in product-versions.json'
+        git commit -m 'Bump API Proxy in product-versions.json'
         git push "$origin_url" "HEAD:$PRODUCT_REPO_BRANCH"
       displayName: Update product-versions.json in product repo
       env:
