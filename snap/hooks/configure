@@ -12,15 +12,8 @@ toml_new_section() {
 	printf "[%s]\n" "$1"
 }
 
-# Work around the fact that there is no consolidated, machine readable
-# output of `hostnamectl` in the version included in core20. Core22 will
-# be more elegant (i.e. `hostnamectl hostname`)
 get_hostname() {
-	hostname="$(/usr/bin/hostnamectl --static)"
-	if [ -z "$hostname" ] ; then
-		hostname="$(/usr/bin/hostnamectl --transient)"
-	fi
-
+	hostname="$(/usr/bin/hostnamectl hostname)"
 	printf "$hostname"
 }
 
