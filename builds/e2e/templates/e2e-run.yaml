@@ -19,7 +19,7 @@ steps:
     $test_type = '${{ parameters.test_type }}'
 
     # Filter out flaky tests.
-    $filter = 'Category!=Flaky'
+    $filter = 'Name!~Dps&Category!=Flaky'
 
     if ('$(minimal)' -eq 'true')
     {

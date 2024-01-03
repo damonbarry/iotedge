@@ -10,6 +10,12 @@ schedules:
     - release/1.4
   always: true
 
+resources:
+  pipelines:
+  - pipeline: ci-build
+    source: 'Azure-IoT-Edge-Core CI Build'
+    branch: 'release/1.4'
+
 variables:
   Codeql.Enabled: false
   DisableDockerDetector: true
@@ -19,98 +25,140 @@ pool:
   demands:
   - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
 
-steps:
-- checkout: self
-  fetchDepth: 1
+jobs:
+- job: ServiceDeploymentTests
+  timeoutInMinutes: 90
+  steps:
+  - checkout: self
+    fetchDepth: 1
 
-- task: AzureKeyVault@1
-  displayName: Get secrets
-  inputs:
-    azureSubscription: $(az.subscription)
-    keyVaultName: $(az.keyVault)
-    secretsFilter: >-
-      TestIotHubConnectionString,
-      TestEventHubCompatibleEndpoint,
-      TestRootCaCertificate,
-      TestRootCaKey,
-      TestRootCaPassword
+  - task: AzureKeyVault@1
+    displayName: Get secrets
+    inputs:
+      azureSubscription: $(az.subscription)
+      keyVaultName: $(az.keyVault)
+      secretsFilter: >-
+        TestBlobStoreSas,
+        TestContainerRegistryPassword,
+        TestEventHubCompatibleEndpoint,
+        TestIotHubConnectionString,
+        TestRootCaCertificate,
+        TestRootCaKey,
+        TestRootCaPassword
 
-- pwsh: |
-    $certsDir = '$(System.ArtifactsDirectory)/certs'
-    New-Item "$certsDir" -ItemType Directory -Force | Out-Null
-    $env:ROOT_CERT | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.cert.pem"
-    $env:ROOT_KEY | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.key.pem"
-    Write-Output "##vso[task.setvariable variable=certsDir]$certsDir"
-  displayName: Install CA keys
-  env:
-    ROOT_CERT: $(TestRootCaCertificate)
-    ROOT_KEY: $(TestRootCaKey)
+  - task: DownloadBuildArtifacts@0
+    displayName: Download artifacts from CI build
+    inputs:
+      buildType: specific
+      project: $(resources.pipeline.ci-build.projectID)
+      pipeline: $(resources.pipeline.ci-build.pipelineName)
+      buildVersionToDownload: specific
+      buildId: $(resources.pipeline.ci-build.runID)
+      downloadType: single
+      artifactName: core-linux
+      allowPartiallySucceededBuilds: true
+      itemPattern: core-linux/artifactInfo.txt
 
-- pwsh: |
-    $testDir = '$(Build.SourcesDirectory)/test/Microsoft.Azure.Devices.Edge.Test'
-    dotnet build $testDir
+  - pwsh: |
+      $certsDir = '$(System.ArtifactsDirectory)/certs'
+      New-Item "$certsDir" -ItemType Directory -Force | Out-Null
+      $env:ROOT_CERT | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.cert.pem"
+      $env:ROOT_KEY | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.key.pem"
+      Write-Output "##vso[task.setvariable variable=certsDir]$certsDir"
+    displayName: Install CA keys
+    env:
+      ROOT_CERT: $(TestRootCaCertificate)
+      ROOT_KEY: $(TestRootCaKey)
 
-    $binDir = Convert-Path "$testDir/bin/Debug/net6.0"
-    Write-Output "##vso[task.setvariable variable=binDir]$binDir"
-  displayName: Build tests
+  - pwsh: |
+      $testDir = '$(Build.SourcesDirectory)/test/Microsoft.Azure.Devices.Edge.Test'
+      dotnet build $testDir
 
-- pwsh: |
-    $context = @{
-      logFile = Join-Path '$(binDir)' 'testoutput.log';
-      caCertScriptPath = Convert-Path '$(Build.SourcesDirectory)/tools/CACertificates';
-      rootCaCertificatePath = Convert-Path '$(certsDir)/rsa_root_ca.cert.pem';
-      rootCaPrivateKeyPath = Convert-Path '$(certsDir)/rsa_root_ca.key.pem';
-    }
-    $context | ConvertTo-Json | Out-File -Encoding Utf8 '$(binDir)/context.json'
-  displayName: Create test arguments file (context.json)
+      $binDir = Convert-Path "$testDir/bin/Debug/net6.0"
+      Write-Output "##vso[task.setvariable variable=binDir]$binDir"
+    displayName: Build tests
 
-- pwsh: |
-    if ($env:EH_ARG -and $env:IH_ARG)
-    {
-      $env:E2E_EVENT_HUB_ENDPOINT = $env:EH_ARG
-      $env:E2E_IOT_HUB_CONNECTION_STRING = $env:IH_ARG
-    }
-    else
-    {
-      $env:E2E_EVENT_HUB_ENDPOINT = $env:EH_KV
-      $env:E2E_IOT_HUB_CONNECTION_STRING = $env:IH_KV
-    }
+  - pwsh: |
+      $imagePrefix = '$(cr.address)/$(cr.labelPrefix)azureiotedge'
+      $imageTag = Get-Content '$(System.ArtifactsDirectory)/core-linux/artifactInfo.txt' |
+        foreach { "$(($_ -split '=')[1])-linux-amd64" }
 
-    $testFile = '$(binDir)/Microsoft.Azure.Devices.Edge.Test.dll'
-    sudo --preserve-env dotnet vstest $testFile --logger:trx --testcasefilter:Name=TempSensor
-  displayName: Run tests
-  env:
-    EH_ARG: $(connstr.eventHub)
-    EH_KV: $(TestEventHubCompatibleEndpoint)
-    IH_ARG: $(connstr.iotHub)
-    IH_KV: $(TestIotHubConnectionString)
-    E2E_ROOT_CA_PASSWORD: $(TestRootCaPassword)
+      $context = @{
+        caCertScriptPath = Convert-Path '$(Build.SourcesDirectory)/tools/CACertificates';
+        loadGenImage = "$imagePrefix-load-gen:$imageTag";
+        logFile = Join-Path '$(binDir)' 'testoutput.log';
+        methodReceiverImage = "$imagePrefix-direct-method-receiver:$imageTag";
+        methodSenderImage = "$imagePrefix-direct-method-sender:$imageTag";
+        metricsValidatorImage = "$imagePrefix-metrics-validator:$imageTag";
+        networkControllerImage = "$imagePrefix-network-controller:$imageTag";
+        numberLoggerImage = "$imagePrefix-number-logger:$imageTag";
+        relayerImage = "$imagePrefix-relayer:$imageTag";
+        registries = @(
+          @{
+            address = '$(cr.address)';
+            username = '$(cr.username)';
+          }
+        );
+        rootCaCertificatePath = Convert-Path '$(certsDir)/rsa_root_ca.cert.pem';
+        rootCaPrivateKeyPath = Convert-Path '$(certsDir)/rsa_root_ca.key.pem';
+        tempFilterFuncImage = "$imagePrefix-functions-filter:$imageTag";
+        tempFilterImage = "$imagePrefix-temperature-filter:$imageTag";
+        testResultCoordinatorImage = "$imagePrefix-test-result-coordinator:$imageTag";
+      }
 
-- task: PublishTestResults@2
-  displayName: Publish test results
-  inputs:
-    testResultsFormat: vstest
-    testResultsFiles: '**/*.trx'
-    searchFolder: $(Build.SourcesDirectory)/TestResults
-    testRunTitle: Service deployment build  ($(Build.BuildNumber) linux amd64)
-    buildPlatform: amd64
-  condition: succeededOrFailed()
+      $context | ConvertTo-Json | Out-File -Encoding Utf8 '$(binDir)/context.json'
+    displayName: Create test arguments file (context.json)
 
-- pwsh: |
-    $logDir = '$(Build.ArtifactStagingDirectory)/logs'
-    New-Item $logDir -ItemType Directory -Force | Out-Null
-    Out-File "$logDir/$(Build.DefinitionName)-$(Build.BuildNumber)"
-    Copy-Item "$(Build.SourcesDirectory)/TestResults" "$logDir/" -Recurse
-    # The setup fixture runs outside the scope of any test, so its logs (*-test-*.log) aren't
-    # included in the TRX. Copy them manually here.
-    Copy-Item "$(binDir)/*-test-*.log" "$logDir/"
-    Copy-Item "$(binDir)/testoutput.log" "$logDir/"
-  displayName: Collect Logs
-  condition: succeededOrFailed()
+  - pwsh: |
+      if ($env:EH_ARG -and $env:IH_ARG)
+      {
+        $env:E2E_EVENT_HUB_ENDPOINT = $env:EH_ARG
+        $env:E2E_IOT_HUB_CONNECTION_STRING = $env:IH_ARG
+      }
+      else
+      {
+        $env:E2E_EVENT_HUB_ENDPOINT = $env:EH_KV
+        $env:E2E_IOT_HUB_CONNECTION_STRING = $env:IH_KV
+      }
 
-- task: PublishBuildArtifacts@1
-  displayName: Publish logs
-  inputs:
-    PathtoPublish: $(Build.ArtifactStagingDirectory)/logs
-    ArtifactName: logs-service-deployment-$(Build.BuildNumber)-linux-amd64
-  condition: succeededOrFailed()
+      $testFile = '$(binDir)/Microsoft.Azure.Devices.Edge.Test.dll'
+      $filter = 'Name!~Dps&Category!=NestedEdgeOnly&Category!=Flaky&Category!=nestededge_isa95'
+      sudo --preserve-env dotnet test $testFile --no-build --logger 'trx' --filter $filter
+    displayName: Run tests
+    env:
+      E2E_BLOB_STORE_SAS: $(TestBlobStoreSas)
+      E2E_REGISTRIES__0__PASSWORD: $(TestContainerRegistryPassword)
+      E2E_ROOT_CA_PASSWORD: $(TestRootCaPassword)
+      EH_ARG: $(connstr.eventHub)
+      EH_KV: $(TestEventHubCompatibleEndpoint)
+      IH_ARG: $(connstr.iotHub)
+      IH_KV: $(TestIotHubConnectionString)
+
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    inputs:
+      testResultsFormat: vstest
+      testResultsFiles: '**/*.trx'
+      searchFolder: $(Build.SourcesDirectory)/TestResults
+      testRunTitle: Service deployment build  ($(Build.BuildNumber) linux amd64)
+      buildPlatform: amd64
+    condition: succeededOrFailed()
+
+  - pwsh: |
+      $logDir = '$(Build.ArtifactStagingDirectory)/logs'
+      New-Item $logDir -ItemType Directory -Force | Out-Null
+      Out-File "$logDir/$(Build.DefinitionName)-$(Build.BuildNumber)"
+      Copy-Item "$(Build.SourcesDirectory)/TestResults" "$logDir/" -Recurse
+      # The setup fixture runs outside the scope of any test, so its logs (*-test-*.log) aren't
+      # included in the TRX. Copy them manually here.
+      Copy-Item "$(binDir)/*-test-*.log" "$logDir/"
+      Copy-Item "$(binDir)/testoutput.log" "$logDir/"
+    displayName: Collect Logs
+    condition: succeededOrFailed()
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish logs
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)/logs
+      ArtifactName: logs-service-deployment-$(Build.BuildNumber)-linux-amd64
+    condition: succeededOrFailed()

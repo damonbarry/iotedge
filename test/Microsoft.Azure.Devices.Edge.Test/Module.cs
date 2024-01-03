@@ -14,7 +14,6 @@ namespace Microsoft.Azure.Devices.Edge.Test
     public class Module : SasManualProvisioningFixture
     {
         const string SensorName = "tempSensor";
-        const string DefaultSensorImage = "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.4";
 
         [TestCase(Protocol.Mqtt)]
         [TestCase(Protocol.Amqp)]
@@ -62,7 +61,8 @@ namespace Microsoft.Azure.Devices.Edge.Test
         [Category("nestededge_isa95")]
         public async Task TempSensor()
         {
-            string sensorImage = Context.Current.TempSensorImage.GetOrElse(DefaultSensorImage);
+            string sensorImage = Context.Current.TempSensorImage.Expect(
+                () => new ArgumentException("tempSensorImage parameter is required for TempSensor test"));
             CancellationToken token = this.TestToken;
 
             EdgeModule sensor;

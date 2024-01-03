@@ -85,7 +85,7 @@ stages:
         inputs:
           targetType: inline
           script: |
-            az login --service-principal -p $(edgebuild-service-principal-secret) -u $(servicePrincipal.clientId) --tenant $(servicePrincipal.tenantId)
+            az login --service-principal -p $(servicePrincipal.secret) -u $(servicePrincipal.clientId) --tenant $(servicePrincipal.tenantId)
 
       - template: templates/nested-get-root-ca.yaml
       - template: templates/nested-get-device-name.yaml
@@ -93,8 +93,8 @@ stages:
       - template: templates/e2e-clear-docker-cached-images.yaml
       - template: templates/e2e-run.yaml
         parameters:
-          EventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
-          IotHubConnectionString: '$(IotHub-ConnStr)'
+          EventHubCompatibleEndpoint: $(connstr.eventHub)
+          IotHubConnectionString: $(connstr.iotHub)
           test_type: nestededge_mqtt
       - template: templates/nested-deploy-config.yaml
         parameters:
@@ -112,8 +112,8 @@ stages:
           name: 4
       - template: templates/e2e-run.yaml
         parameters:
-          EventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
-          IotHubConnectionString: '$(IotHub-ConnStr)'
+          EventHubCompatibleEndpoint: $(connstr.eventHub)
+          IotHubConnectionString: $(connstr.iotHub)
           test_type: nestededge_amqp
 
 - stage: Cleanup

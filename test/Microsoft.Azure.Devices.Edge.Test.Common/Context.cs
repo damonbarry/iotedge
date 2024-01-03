@@ -12,6 +12,11 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
 
     public class Context
     {
+        const string DefaultAgentImage = "mcr.microsoft.com/azureiotedge-agent:1.4";
+        const string DefaultHubImage = "mcr.microsoft.com/azureiotedge-hub:1.4";
+        const string DefaultSensorImage = "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.4";
+        const string DefaultDiagnosticsImage = "mcr.microsoft.com/azureiotedge-diagnostics:1.4";
+
         public Context()
         {
             IConfiguration context = new ConfigurationBuilder()
@@ -85,10 +90,10 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
             this.ParentDeviceId = Option.Maybe(Get("parentDeviceId"));
             this.DpsIdScope = Option.Maybe(Get("dpsIdScope"));
             this.DpsGroupKey = Option.Maybe(Get("DPS_GROUP_KEY"));
-            this.EdgeAgentImage = Option.Maybe(Get("edgeAgentImage"));
-            this.EdgeHubImage = Option.Maybe(Get("edgeHubImage"));
+            this.EdgeAgentImage = Option.Maybe(Get("edgeAgentImage")).Else(Option.Some(DefaultAgentImage));
+            this.EdgeHubImage = Option.Maybe(Get("edgeHubImage")).Else(Option.Some(DefaultHubImage));
             this.EdgeHubSchemaVersion = Option.Maybe(Get("edgeHubSchemaVersion"));
-            this.DiagnosticsImage = Option.Maybe(Get("diagnosticsImage"));
+            this.DiagnosticsImage = Option.Maybe(Get("diagnosticsImage")).Else(Option.Some(DefaultDiagnosticsImage));
             this.EventHubEndpoint = Get("EVENT_HUB_ENDPOINT");
             Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubEndpoint), $"EVENT_HUB_ENDPOINT is missing from environment or context.json.");
             this.LogFile = Option.Maybe(Get("logFile"));
@@ -104,7 +109,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
             this.TeardownTimeout = TimeSpan.FromMinutes(context.GetValue("teardownTimeoutMinutes", 2));
             this.TempFilterFuncImage = Option.Maybe(Get("tempFilterFuncImage"));
             this.TempFilterImage = Option.Maybe(Get("tempFilterImage"));
-            this.TempSensorImage = Option.Maybe(Get("tempSensorImage"));
+            this.TempSensorImage = Option.Maybe(Get("tempSensorImage")).Else(Option.Some(DefaultSensorImage));
             this.NumberLoggerImage = Option.Maybe(Get("numberLoggerImage"));
             this.MetricsValidatorImage = Option.Maybe(Get("metricsValidatorImage"));
             this.TestResultCoordinatorImage = Option.Maybe(Get("testResultCoordinatorImage"));

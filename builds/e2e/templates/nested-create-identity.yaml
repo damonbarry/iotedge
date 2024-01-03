@@ -4,7 +4,7 @@ steps:
     inputs:
       targetType: inline
       script: |     
-        az login --service-principal -p $(edgebuild-service-principal-secret) -u $(servicePrincipal.clientId) --tenant $(servicePrincipal.tenantId) 
+        az login --service-principal -p $(servicePrincipal.secret) -u $(servicePrincipal.clientId) --tenant $(servicePrincipal.tenantId)
   - task: Bash@3
     displayName: 'Create identity'
     name: createIdentity
@@ -15,7 +15,7 @@ steps:
 
         echo "Extracting hub name from connection string"
         #extract full hub name
-        tmp=$(echo "$(IotHub-ConnStr)" | sed -n 's/HostName=\(.*\);SharedAccessKeyName.*/\1/p')
+        tmp=$(echo "$(connstr.iotHub)" | sed -n 's/HostName=\(.*\);SharedAccessKeyName.*/\1/p')
         #remove the .azure-devices.net  from $tmp
         iotHubName=$(echo $tmp | sed -n 's/\(.?*\)\..*/\1/p')
         echo "Found Hub name: ${iotHubName}"

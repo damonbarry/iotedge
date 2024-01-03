@@ -14,7 +14,6 @@ namespace Microsoft.Azure.Devices.Edge.Test
     public class Image : SasManualProvisioningFixture
     {
         const string SensorName = "tempSensor";
-        const string DefaultSensorImage = "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.4";
 
         [Test]
         [Category("CentOsSafe")]
@@ -23,7 +22,8 @@ namespace Microsoft.Azure.Devices.Edge.Test
             CancellationToken token = this.TestToken;
 
             // Create initial deployment with simulated temperature sensor
-            string sensorImage = Context.Current.TempSensorImage.GetOrElse(DefaultSensorImage);
+            string sensorImage = Context.Current.TempSensorImage.Expect(
+                () => new ArgumentException("tempSensorImage parameter is required for ImageGarbageCollection test"));
             EdgeDeployment deployment1 = await this.runtime.DeployConfigurationAsync(
                 builder =>
                 {
