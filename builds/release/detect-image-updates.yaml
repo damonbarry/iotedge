@@ -105,18 +105,25 @@ steps:
       # $base_images contains entries in the form of:
       # mcr.microsoft.com/dotnet/runtime@6.0-alpine,sha256:b7a9b8fbdb096327a1e05cda40d40afbec54b96e1a6a1bb7577e67344f9d99e4
 
+      uptodate=0
       for base_info in ${base_images[@]}; do
         IFS=',' read base_image current_digest <<< "$base_info"
         latest_digest="$(docker buildx imagetools inspect $base_image --format '{{json .Manifest}}' | jq -r '.digest')"
 
         echo -e "  base:\t\t$base_image\n  current:\t$current_digest\n  latest:\t$latest_digest"
+
         if [ -n "$current_digest" ] && [ "$current_digest" != "$latest_digest" ]
         then
           echo "  ## NEEDS UPDATE ##"
         else
-          remove+=( "$image" )
+          (( uptodate += 1 ))
         fi
       done
+
+      # only remove an image from the list of images to update if *all* base images are up to date
+      if (( uptodate == ${#base_images[@]} )); then
+        remove+=( "$image" )
+      fi
     done
 
     # filter up-to-date images out of the list
