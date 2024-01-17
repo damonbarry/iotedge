@@ -1,10 +1,12 @@
 parameters:
+  depends: ''
   upstream.protocol: 'amqp'
-  test.l4DeploymentFileName: ""
+  test.l4DeploymentFileName: ''
 
 jobs:
   - job: SetupVM_level5_${{ parameters['upstream.protocol'] }}
     displayName: SettingUp level 5 for ${{ parameters['upstream.protocol'] }}
+    dependsOn: [ ${{ parameters['depends'] }} ]
     timeoutInMinutes: 180
     variables:
       artifactName: iotedged-ubuntu20.04-amd64

@@ -16,6 +16,7 @@ resources:
     name: Azure/azure-iotedge
 
 variables:
+  Codeql.Enabled: false
   DisableDockerDetector: true
 
 stages:
@@ -129,7 +130,7 @@ stages:
     - script: |
         #!/bin/bash
         set -euo pipefail
-        
+
         # this script assumes the following steps have already been taken:
         # - a release commit is reachable from this run's source commit
         # - the release commit was tagged with the new version
@@ -239,10 +240,10 @@ stages:
     displayName: Build Docker Images
     dependsOn: BuildExecutables
 
-    - task: DownloadBuildArtifacts@0
+    - task: DownloadBuildArtifacts@1
       displayName: Download Executables
       inputs:
-        buildType: 'current'
+        buildType: current
         downloadPath: '$(Build.ArtifactStagingDirectory)'
         downloadType: specific
         extractTars: true
@@ -252,14 +253,14 @@ stages:
       inputs:
         sourceFolder: '$(Agent.TempDirectory)/extracted_tars/x86_64'
         contents: '**'
-        targetFolder: '$(Build.BinariesDirectory)/publish'       
+        targetFolder: '$(Build.BinariesDirectory)/publish'
 
     - task: CopyFiles@2
       displayName: Copy Executables - arm32
       inputs:
         sourceFolder: '$(Agent.TempDirectory)/extracted_tars/armv7l'
         contents: '**'
-        targetFolder: '$(Build.BinariesDirectory)/publish'    
+        targetFolder: '$(Build.BinariesDirectory)/publish'
 
     - task: CopyFiles@2
       displayName: Copy Executables - arm64
@@ -267,7 +268,7 @@ stages:
         sourceFolder: '$(Agent.TempDirectory)/extracted_tars/aarch64'
         contents: '**'
         targetFolder: '$(Build.BinariesDirectory)/publish'
-        
+
     - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
       displayName: Generate SBOM
       inputs:
@@ -285,6 +286,197 @@ stages:
       inputs:
         dockerImagesToScan: '$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-amd64,$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-arm32v7,$(registry.address)/microsoft/azureiotedge-api-proxy:$(version)-linux-arm64v8'
 
+# ################################################################################
+# - stage: Test
+# ################################################################################
+#   displayName: Test API Proxy
+#   condition: succeeded('Build')
+#   dependsOn:
+#   - PrepareRelease
+#   - Build
+
+#   variables:
+#     ${{ if eq(variables['Build.Reason'], 'Manual') }}:
+#       version: $[ stageDependencies.PrepareRelease.ManualTrigger.outputs['commit.version'] ]
+#     ${{ else }}:
+#       version: $[ stageDependencies.PrepareRelease.PipelineTrigger.outputs['commit.version'] ]
+
+#   jobs:
+#   - job: test
+#     displayName: Test Linux
+
+#     variables:
+#       os: linux
+#       verbose: false
+
+#     strategy:
+#       matrix:
+#         arm32v7:
+#           pool: $(pool.linux.arm.name)
+#           # Since this pipeline is about testing the API Proxy Docker image for release and not our
+#           # host components, we'll run the arm32v7 Docker image on an arm64v8 host OS, with arm64v8
+#           # host components, for speed and convenience.
+#           agent: agent-aziotedge-ubuntu-20.04-arm64-docker
+#           arch: arm32v7
+#         arm64v8:
+#           pool: $(pool.linux.arm.name)
+#           agent: agent-aziotedge-ubuntu-20.04-arm64-docker
+#           arch: arm64v8
+#         amd64:
+#           pool: $(pool.linux.name)
+#           agent: agent-aziotedge-ubuntu-20.04-msmoby
+#           arch: amd64
+
+#     pool:
+#       name: $(pool)
+#       demands:
+#       - ImageOverride -equals $(agent)
+
+#     steps:
+#     - checkout: self
+#       fetchDepth: 0
+
+#     - task: AzureKeyVault@1
+#       displayName: Get secrets
+#       inputs:
+#         azureSubscription: $(az.subscription)
+#         keyVaultName: $(kv.name)
+#         secretsFilter: >-
+#           ReleaseContainerRegistryPassword,
+#           TestEventHubCompatibleEndpoint,
+#           TestIotHubConnectionString,
+#           TestIotHubResourceId,
+#           TestRootCaCertificate,
+#           TestRootCaKey,
+#           TestRootCaPassword
+
+#     - pwsh: |
+#         $certsDir = '$(System.ArtifactsDirectory)/certs'
+#         New-Item "$certsDir" -ItemType Directory -Force | Out-Null
+#         $env:ROOT_CERT | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.cert.pem"
+#         $env:ROOT_KEY | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.key.pem"
+#         Write-Output "##vso[task.setvariable variable=certsDir]$certsDir"
+#       displayName: Install CA keys
+#       env:
+#         ROOT_CERT: $(TestRootCaCertificate)
+#         ROOT_KEY: $(TestRootCaKey)
+
+#     - pwsh: |
+#         $testDir = '$(Build.SourcesDirectory)/test/Microsoft.Azure.Devices.Edge.Test'
+#         dotnet build -c Release $testDir
+
+#         $binDir = Convert-Path "$testDir/bin/Release/net6.0"
+#         Write-Output "##vso[task.setvariable variable=binDir]$binDir"
+#       displayName: Build tests
+#       env:
+#         http_proxy: $(Agent.ProxyUrl)
+#         https_proxy: $(Agent.ProxyUrl)
+
+#     - pwsh: |
+#         $caCertScriptPath = Convert-Path '$(Build.SourcesDirectory)/tools/CACertificates'
+#         $rootCaCertificatePath = Convert-Path '$(certsDir)/rsa_root_ca.cert.pem';
+#         $rootCaPrivateKeyPath = Convert-Path '$(certsDir)/rsa_root_ca.key.pem';
+#         $runtimeVersion = (
+#           (
+#             (Invoke-WebRequest https://aka.ms/latest-aziot-edge).Content | ConvertFrom-Json
+#           )."aziot-edge" | Select-String -Pattern '([0-9]+\.[0-9]+)\.[0-9]+'
+#         ).Matches[0].Groups[1].Value
+#         $edgeAgentImage = "mcr.microsoft.com/azureiotedge-agent:$runtimeVersion";
+#         $edgeHubImage = "mcr.microsoft.com/azureiotedge-hub:$runtimeVersion";
+#         $metricsCollectorImage = "$(registry.address)/microsoft/azureiotedge-metrics-collector:$(version)-$(os)-$(arch)"
+
+#         echo "Edge Agent image: $edgeAgentImage"
+#         echo "Edge Hub image: $edgeHubImage"
+#         echo "Metrics Collector image: $metricsCollectorImage"
+
+#         $context = @{
+#           nestededge = 'false';
+#           isa95Tag = 'false';
+#           edgeAgentImage = "$edgeAgentImage";
+#           edgeHubImage = "$edgeHubImage";
+#           metricsCollectorImage = "$metricsCollectorImage";
+#           iotHubResourceId = "$env:IOT_HUB_RESOURCE_ID";
+#           registries = @(
+#             @{
+#               address = '$(registry.address)';
+#               username = '$(registry.username)';
+#             }
+#           );
+#           caCertScriptPath = "$caCertScriptPath";
+#           rootCaCertificatePath = "$rootCaCertificatePath";
+#           rootCaPrivateKeyPath = "$rootCaPrivateKeyPath";
+#           logFile = Join-Path '$(binDir)' 'testoutput.log';
+#           verbose = '$(verbose)';
+#           getSupportBundle = 'true';
+#           teardownTimeoutMinutes = 10;
+#         }
+
+#         if ('$(arch)' -eq 'arm32v7')
+#         {
+#           $context['optimizeForPerformance'] = 'false'
+#           $context['setupTimeoutMinutes'] = 10
+#           $context['teardownTimeoutMinutes'] = 10
+#           $context['testTimeoutMinutes'] = 10
+#         }
+
+#         if ($env:AGENT_PROXYURL)
+#         {
+#           $context['testRunnerProxy'] = $env:AGENT_PROXYURL
+#           $context['edgeProxy'] = $env:AGENT_PROXYURL
+#         }
+
+#         $context | ConvertTo-Json | Out-File -Encoding Utf8 '$(binDir)/context.json'
+#         Get-Content -Path '$(binDir)/context.json'
+#       displayName: Create test arguments file (context.json)
+#       env:
+#         IOT_HUB_RESOURCE_ID: $(TestIotHubResourceId)
+
+#     - script: |
+#         sudo --preserve-env dotnet test '$(binDir)/Microsoft.Azure.Devices.Edge.Test.dll' \
+#           --no-build \
+#           --logger 'trx' \
+#           --filter 'MetricsCollector'
+#       displayName: Run tests
+#       env:
+#         E2E_EVENT_HUB_ENDPOINT: $(TestEventHubCompatibleEndpoint)
+#         E2E_IOT_HUB_CONNECTION_STRING: $(TestIotHubConnectionString)
+#         E2E_REGISTRIES__0__PASSWORD: $(ReleaseContainerRegistryPassword)
+#         E2E_ROOT_CA_PASSWORD: $(TestRootCaPassword)
+
+#     - task: PublishTestResults@2
+#       displayName: Publish test results
+#       inputs:
+#         testRunner: vstest
+#         testResultsFiles: '**/*.trx'
+#         searchFolder: $(Build.SourcesDirectory)/TestResults
+#         testRunTitle: End-to-end tests ($(Build.BuildNumber) $(System.JobDisplayName))
+#         buildPlatform: $(arch)
+#       condition: succeededOrFailed()
+
+#     - pwsh: |
+#         $logDir = '$(Build.ArtifactStagingDirectory)/logs'
+#         New-Item $logDir -ItemType Directory -Force | Out-Null
+#         Out-File "$logDir/$(Build.DefinitionName)-$(Build.BuildNumber)"
+#         Copy-Item "$(Build.SourcesDirectory)/TestResults" "$logDir/" -Recurse
+#         # The setup fixtures run outside the scope of any test, so their logs (*-[test|device]-*.log)
+#         # aren't included in the TRX. Copy them manually here.
+#         Copy-Item '$(binDir)/context.json' "$logDir/"
+#         Copy-Item "$(binDir)/*-test-*.log" "$logDir/"
+#         Copy-Item "$(binDir)/*-device-*.log" "$logDir/"
+#         Copy-Item "$(binDir)/testoutput.log" "$logDir/"
+#         Copy-Item "$(binDir)/supportbundle*" "$logDir/"
+#         $artifactSuffix = '$(Build.BuildNumber)-$(System.PhaseName)' -replace '_','-'
+#         Write-Output "##vso[task.setvariable variable=artifactSuffix]$artifactSuffix"
+#       displayName: Collect Logs
+#       condition: always()
+
+#     - task: PublishBuildArtifacts@1
+#       displayName: Publish logs
+#       inputs:
+#         PathtoPublish: $(Build.ArtifactStagingDirectory)/logs
+#         ArtifactName: logs-end-to-end-$(artifactSuffix)
+#       condition: always()
+
 ################################################################################
 - stage: Test
 ################################################################################
@@ -295,186 +487,326 @@ stages:
   - Build
 
   variables:
-    ${{ if eq(variables['Build.Reason'], 'Manual') }}:
-      version: $[ stageDependencies.PrepareRelease.ManualTrigger.outputs['commit.version'] ]
-    ${{ else }}:
-      version: $[ stageDependencies.PrepareRelease.PipelineTrigger.outputs['commit.version'] ]
+    verbose: false
 
   jobs:
-  - job: test
-    displayName: Test Linux
-
-    variables:
-      os: linux
-      verbose: false
-
-    strategy:
-      matrix:
-        arm32v7:
-          pool: $(pool.linux.arm.name)
-          # Since this pipeline is about testing the API Proxy Docker image for release and not our
-          # host components, we'll run the arm32v7 Docker image on an arm64v8 host OS, with arm64v8
-          # host components, for speed and convenience.
-          agent: agent-aziotedge-ubuntu-20.04-arm64-docker
-          arch: arm32v7
-        arm64v8:
-          pool: $(pool.linux.arm.name)
-          agent: agent-aziotedge-ubuntu-20.04-arm64-docker
-          arch: arm64v8
-        amd64:
-          pool: $(pool.linux.name)
-          agent: agent-aziotedge-ubuntu-20.04-msmoby
-          arch: amd64
-
+  - job: lock_nested_agents
+    displayName: Lock nested agents
+    timeoutInMinutes: 180
     pool:
-      name: $(pool)
+      name: $(pool.linux.name)
       demands:
-      - ImageOverride -equals $(agent)
-
+      - ImageOverride -equals agent-aziotedge-ubuntu-22.04-msmoby
     steps:
-    - checkout: self
-      fetchDepth: 0
-
     - task: AzureKeyVault@1
       displayName: Get secrets
       inputs:
         azureSubscription: $(az.subscription)
-        keyVaultName: $(kv.name)
-        secretsFilter: >-
-          ReleaseContainerRegistryPassword,
-          TestEventHubCompatibleEndpoint,
-          TestIotHubConnectionString,
-          TestIotHubResourceId,
-          TestRootCaCertificate,
-          TestRootCaKey,
-          TestRootCaPassword
+        KeyVaultName: edgebuildkv
+        SecretsFilter: IotEdge1-PAT-msazure
+    - script: |
+        scripts/linux/nestedAgentLock.sh -a "$(agent.group)" -b "$(Build.BuildId)" -n 1 -u mqtt
+      displayName: Lock nested agents
+      env:
+        PAT: "$(IotEdge1-PAT-msazure)"
 
-    - pwsh: |
-        $certsDir = '$(System.ArtifactsDirectory)/certs'
-        New-Item "$certsDir" -ItemType Directory -Force | Out-Null
-        $env:ROOT_CERT | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.cert.pem"
-        $env:ROOT_KEY | Out-File -Encoding Utf8 "$certsDir/rsa_root_ca.key.pem"
-        Write-Output "##vso[task.setvariable variable=certsDir]$certsDir"
-      displayName: Install CA keys
+  ######
+  - job: setup_vm_level5
+    displayName: Set up level 5
+    dependsOn: lock_nested_agents
+    timeoutInMinutes: 180
+    variables:
+      # TODO: We don't need these artifacts if we're installing production bits
+      artifactName: iotedged-ubuntu20.04-amd64
+      identityServiceArtifactName: packages_ubuntu-20.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      level: 5
+      deploymentFile: nestededge_topLayerBaseDeployment_mqtt.json
+      parentName: ''
+      parentDeviceId: ''
+      upstreamProtocol: mqtt
+    pool:
+      name: $(pool.name)
+      demands:
+      - agent-group -equals $(agent.group)
+      - Agent.OS -equals Linux
+      - Agent.OSArchitecture -equals X64
+      - status -equals unlocked_$(Build.BuildId)_L5_mqtt
+    steps:
+    - task: AzureKeyVault@1
+      displayName: Get secrets
+      inputs:
+        azureSubscription: $(az.subscription)
+        KeyVaultName: edgebuildkv
+        SecretsFilter: >-
+          xyz
+    - task: AzureKeyVault@1
+      displayName: Get secrets
+      inputs:
+        azureSubscription: $(az.subscription)
+        KeyVaultName: edge-e2e-kv
+        SecretsFilter: >-
+          TestContainerRegistryPassword,
+          TestIotHubConnectionString,
+          TestRootCaCertificate
+    - template: e2e-clean-directory.yaml
+    - script: |
+        echo "$ROOT_CERT" | sudo tee /usr/local/share/ca-certificates/azure-iot-test-only.root.ca.cert.pem.crt
+        sudo update-ca-certificates
+      displayName: Install root CA certificate
       env:
         ROOT_CERT: $(TestRootCaCertificate)
-        ROOT_KEY: $(TestRootCaKey)
-    
-    - pwsh: |
-        $testDir = '$(Build.SourcesDirectory)/test/Microsoft.Azure.Devices.Edge.Test'
-        dotnet build -c Release $testDir
-    
-        $binDir = Convert-Path "$testDir/bin/Release/net6.0"
-        Write-Output "##vso[task.setvariable variable=binDir]$binDir"
-      displayName: Build tests
-      env:
-        http_proxy: $(Agent.ProxyUrl)
-        https_proxy: $(Agent.ProxyUrl)
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(az.subscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -euo pipefail
 
-    - pwsh: |
-        $caCertScriptPath = Convert-Path '$(Build.SourcesDirectory)/tools/CACertificates'
-        $rootCaCertificatePath = Convert-Path '$(certsDir)/rsa_root_ca.cert.pem';
-        $rootCaPrivateKeyPath = Convert-Path '$(certsDir)/rsa_root_ca.key.pem';
-        $runtimeVersion = (
-          (
-            (Invoke-WebRequest https://aka.ms/latest-aziot-edge).Content | ConvertFrom-Json
-          )."aziot-edge" | Select-String -Pattern '([0-9]+\.[0-9]+)\.[0-9]+'
-        ).Matches[0].Groups[1].Value
-        $edgeAgentImage = "mcr.microsoft.com/azureiotedge-agent:$runtimeVersion";
-        $edgeHubImage = "mcr.microsoft.com/azureiotedge-hub:$runtimeVersion";
-        $metricsCollectorImage = "$(registry.address)/microsoft/azureiotedge-metrics-collector:$(version)-$(os)-$(arch)"
+          # extract IoT hub name from connection string
+          hostname="$(echo "$IOTHUB_CONNSTR" | sed -n 's/HostName=\(.*\);SharedAccessKeyName.*/\1/p')"
+          hubName="$(echo $hostname | sed -n 's/\(.?*\)\..*/\1/p')"
 
-        echo "Edge Agent image: $edgeAgentImage"
-        echo "Edge Hub image: $edgeHubImage"
-        echo "Metrics Collector image: $metricsCollectorImage"
+          az account set -s '$(azure.subscription)'
+          deviceId="level_$(level)_$(Build.BuildId)$(upstreamProtocol)"
 
-        $context = @{
-          nestededge = 'false';
-          isa95Tag = 'false';
-          edgeAgentImage = "$edgeAgentImage";
-          edgeHubImage = "$edgeHubImage";
-          metricsCollectorImage = "$metricsCollectorImage";
-          iotHubResourceId = "$env:IOT_HUB_RESOURCE_ID";
-          registries = @(
-            @{
-              address = '$(registry.address)';
-              username = '$(registry.username)';
-            }
-          );
-          caCertScriptPath = "$caCertScriptPath";
-          rootCaCertificatePath = "$rootCaCertificatePath";
-          rootCaPrivateKeyPath = "$rootCaPrivateKeyPath";
-          logFile = Join-Path '$(binDir)' 'testoutput.log';
-          verbose = '$(verbose)';
-          getSupportBundle = 'true';
-          teardownTimeoutMinutes = 10;
-        }
-    
-        if ('$(arch)' -eq 'arm32v7')
-        {
-          $context['optimizeForPerformance'] = 'false'
-          $context['setupTimeoutMinutes'] = 10
-          $context['teardownTimeoutMinutes'] = 10
-          $context['testTimeoutMinutes'] = 10
-        }
-    
-        if ($env:AGENT_PROXYURL)
-        {
-          $context['testRunnerProxy'] = $env:AGENT_PROXYURL
-          $context['edgeProxy'] = $env:AGENT_PROXYURL
-        }
-        
-        $context | ConvertTo-Json | Out-File -Encoding Utf8 '$(binDir)/context.json'
-        Get-Content -Path '$(binDir)/context.json'
-      displayName: Create test arguments file (context.json)
-      env:
-        IOT_HUB_RESOURCE_ID: $(TestIotHubResourceId)
+          echo "Creating edge device '$deviceId' on IoT hub '$hubName' in subscription '$(azure.subscription)'"
+          az iot hub device-identity create -n "$hubName" -d "$deviceId" --ee -o none
+          if [ "$LEVEL" != "5" ]; then
+              echo "Scoping edge device to parent device '$(parentDeviceId)'"
+              az iot hub device-identity parent set -d "$deviceId" -n "$hubName" --pd '$(parentDeviceId)'
+          fi
 
+          cs="$(az iot hub device-identity connection-string show \
+            -d "$deviceId" -n "$hubName" --query connectionString -o tsv)"
+
+          #set output variable to use later in the job
+          echo "##vso[task.setvariable variable=connectionString]$cs"
+          echo "##vso[task.setvariable variable=deviceId]$deviceId"
+          echo "##vso[task.setvariable variable=iotHubName]$hubName"
+
+          #set output variable outside job
+          echo "##vso[task.setvariable variable=connectionString;isOutput=true]$cs"
+          echo "##vso[task.setvariable variable=iotHubName;isOutput=true]$hubName"
+          echo "##vso[task.setvariable variable=parentDeviceId;isOutput=true]$deviceId"
+        env:
+          IOTHUB_CONNSTR: '$(TestIotHubConnectionString)'
+    - checkout: self
+      clean: true
+      submodules: recursive
     - script: |
-        sudo --preserve-env dotnet test '$(binDir)/Microsoft.Azure.Devices.Edge.Test.dll' \
-          --no-build \
-          --logger 'trx' \
-          --filter 'MetricsCollector'
-      displayName: Run tests
+        version=$(curl -s https://raw.githubusercontent.com/Azure/azure-iotedge/main/product-versions.json | jq -r '
+          .channels[] | select(.name == "lts").products[] | select (.id == "aziot-edge").version
+        ')
+        echo "##vso[task.setvariable variable=edgeVersion;isOutput=true]$version"
+      displayName: Get IoT Edge version
+    - script: |
+        set -euo pipefail
+
+        echo 'Uninstall IoT Edge'
+        sudo systemctl stop aziot-* && sudo apt-get -y purge aziot-*
+
+        echo 'Delete config files'
+        sudo rm -r /var/lib/aziot /var/lib/iotedge /etc/aziot /etc/systemd/system/aziot-*.service.d
+
+        echo 'Restart Docker'
+        sudo systemctl restart docker # needed due to https://github.com/moby/moby/issues/23302
+
+        echo 'Install IoT Edge'
+        sudo apt-get -y install aziot-edge
+
+        export image_architecture_label=amd64
+
+        sudo scripts/linux/nested-edge-deploy-agent.sh \
+          -testDir "$(Agent.HomeDirectory)/.." \h
+          -releaseLabel "ct$(agent.group)" \
+          -artifactImageBuildNumber '$(edgeVersion)' \
+          -containerRegistry "$(cr.address)" \
+          -containerRegistryUsername "$(cr.username)" \
+          -containerRegistryPassword "$REGISTRY_PASSWORD" \
+          -iotHubConnectionString "$IOTHUB_CONNSTR" \
+          -deploymentFileName "$(deploymentFile)" \
+          -storageAccountConnectionString "none" \
+          -edgeRuntimeBuildNumber "$(Build.BuildNumber)" \
+          -subscription "$(azure.subscription)" \
+          -level "$(level)" \
+          -parentName "$(parentName)" \
+          -connectionString "$DEVICE_CONNSTR" \
+          -iotHubName "$(iotHubName)" \
+          -deviceId "$(deviceId)" \
+          -waitForTestComplete \
+          -cleanAll
+      displayName: Install and configure IoT Edge
       env:
-        E2E_EVENT_HUB_ENDPOINT: $(TestEventHubCompatibleEndpoint)
-        E2E_IOT_HUB_CONNECTION_STRING: $(TestIotHubConnectionString)
-        E2E_REGISTRIES__0__PASSWORD: $(ReleaseContainerRegistryPassword)
-        E2E_ROOT_CA_PASSWORD: $(TestRootCaPassword)
+        DEVICE_CONNSTR: '$(connectionString)'
+        IOTHUB_CONNSTR: '$(TestIotHubConnectionString)'
+        REGISTRY_PASSWORD: '$(TestContainerRegistryPassword)'
 
-    - task: PublishTestResults@2
-      displayName: Publish test results
+  - job: setup_vm_level4
+    displayName: Set up level 4
+    dependsOn: setup_vm_level5
+    timeoutInMinutes: 180
+    variables:
+      identityServiceArtifactName: packages_ubuntu-20.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      artifactName: iotedged-ubuntu20.04-amd64
+      parentName: $[ dependencies.setup_vm_level5.outputs['deployIoTEdge.deviceName'] ]
+      parentDeviceId: $[ dependencies.setup_vm_level5.outputs['createIdentity.parentDeviceId'] ]
+      deploymentFile: nestededge_middleLayerBaseDeployment_mqtt.json
+      level: 4
+      upstreamProtocol: mqtt
+    pool:
+     name: $(pool.name)
+     demands:
+       - agent-group -equals $(agent.group)
+       - Agent.OS -equals Linux
+       - Agent.OSArchitecture -equals X64
+       - status -equals unlocked_$(Build.BuildId)_L4_mqtt
+    steps:
+      - template: nested-get-secrets.yaml
+      - template: e2e-clean-directory.yaml
+      - template: nested-get-root-ca.yaml
+      - template: nested-create-identity.yaml
+      - template: nested-agent-deploy.yaml
+  ######
+
+  - template: templates/nested-parent-vm-setup.yaml
+    parameters:
+      depends: lock_nested_agents
+      upstream.protocol: mqtt
+      test.l4DeploymentFileName: 'nestededge_middleLayerBaseDeployment_mqtt.json'
+
+  - job:  SetupVM_and_RunTest_level3
+    dependsOn:
+    - setup_vm_level5
+    - setup_vm_level4
+    displayName: Set up and run tests
+    timeoutInMinutes: 180
+    condition: succeeded()
+    variables:
+      parentName: $[ dependencies.setup_vm_level4.outputs['deployIoTEdge.deviceName'] ]
+      parentDeviceId: $[ dependencies.setup_vm_level4.outputs['createIdentity.parentDeviceId'] ]
+      lvl5DeviceId: $[ dependencies.setup_vm_level5.outputs['createIdentity.parentDeviceId'] ]
+      iotHubName: $[ dependencies.setup_vm_level5.outputs['createIdentity.iotHubName'] ]
+      os: linux
+      arch: amd64
+      artifactName: iotedged-ubuntu20.04-amd64
+      identityServiceArtifactName: packages_ubuntu-20.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      nestededge: true
+    pool:
+      name: $(pool.name)
+      demands:
+        - agent-group -equals $(agent.group)
+        - Agent.OS -equals Linux
+        - Agent.OSArchitecture -equals X64
+        - status -equals unlocked_$(Build.BuildId)_L3_mqtt
+    steps:
+    - task: AzureKeyVault@1
+      displayName: 'Get secrets from edgebuildkv'
       inputs:
-        testRunner: vstest
-        testResultsFiles: '**/*.trx'
-        searchFolder: $(Build.SourcesDirectory)/TestResults
-        testRunTitle: End-to-end tests ($(Build.BuildNumber) $(System.JobDisplayName))
-        buildPlatform: $(arch)
-      condition: succeededOrFailed()
+        azureSubscription: $(az.subscription)
+        KeyVaultName: edgebuildkv
+        SecretsFilter: >-
+          GitHubAccessToken,
+          IotEdge1-PAT-msazure
 
-    - pwsh: |
-        $logDir = '$(Build.ArtifactStagingDirectory)/logs'
-        New-Item $logDir -ItemType Directory -Force | Out-Null
-        Out-File "$logDir/$(Build.DefinitionName)-$(Build.BuildNumber)"
-        Copy-Item "$(Build.SourcesDirectory)/TestResults" "$logDir/" -Recurse
-        # The setup fixtures run outside the scope of any test, so their logs (*-[test|device]-*.log)
-        # aren't included in the TRX. Copy them manually here.
-        Copy-Item '$(binDir)/context.json' "$logDir/"
-        Copy-Item "$(binDir)/*-test-*.log" "$logDir/"
-        Copy-Item "$(binDir)/*-device-*.log" "$logDir/"
-        Copy-Item "$(binDir)/testoutput.log" "$logDir/"
-        Copy-Item "$(binDir)/supportbundle*" "$logDir/"
-        $artifactSuffix = '$(Build.BuildNumber)-$(System.PhaseName)' -replace '_','-'
-        Write-Output "##vso[task.setvariable variable=artifactSuffix]$artifactSuffix"
-      displayName: Collect Logs
-      condition: always()
-
-    - task: PublishBuildArtifacts@1
-      displayName: Publish logs
+    - task: AzureKeyVault@1
+      displayName: 'Get secrets from $(azure.keyVault)'
       inputs:
-        PathtoPublish: $(Build.ArtifactStagingDirectory)/logs
-        ArtifactName: logs-end-to-end-$(artifactSuffix)
-      condition: always()
+        azureSubscription: $(az.subscription)
+        KeyVaultName: $(azure.keyVault)
+        SecretsFilter: >-
+          IotHub-ConnStr,
+          IotHub-EventHubConnStr
+
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/nested-get-root-ca.yaml
+    - template: templates/nested-get-device-name.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
+    - template: templates/e2e-run.yaml
+      parameters:
+        EventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
+        IotHubConnectionString: '$(IotHub-ConnStr)'
+        test_type: nestededge_mqtt
+    - template: templates/nested-deploy-config.yaml
+      parameters:
+        deviceId: $(lvl5DeviceId)
+        deploymentFile: nestededge_topLayerBaseDeployment_amqp.json
+        changeDeployConfigOnly: true
+        level: 5
+        name: 5
+    - template: templates/nested-deploy-config.yaml
+      parameters:
+        deviceId: $(parentDeviceId)
+        deploymentFile: nestededge_middleLayer_e2e_amqp.json
+        changeDeployConfigOnly: true
+        level: 4
+        name: 4
+    - template: templates/e2e-run.yaml
+      parameters:
+        EventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
+        IotHubConnectionString: '$(IotHub-ConnStr)'
+        test_type: nestededge_amqp
+
+  - job:  Unlock_agents
+    displayName: Unlock agents
+    dependsOn: SetupVM_and_RunTest_level3
+    condition: always()
+    timeoutInMinutes: 2
+    pool:
+      name: $(pool.name)
+      demands:
+        - agent-group -equals $(agent.group)
+        - Agent.OS -equals Linux
+        - Agent.OSArchitecture -equals X64
+    steps:
+    - task: AzureKeyVault@1
+      displayName: 'Get secrets from edgebuildkv'
+      inputs:
+        azureSubscription: $(az.subscription)
+        KeyVaultName: edgebuildkv
+        SecretsFilter: >-
+          GitHubAccessToken,
+          IotEdge1-PAT-msazure
+    - template: templates/unlock-test-agents.yaml
+
+  - job:  Clean_up_identities
+    displayName: Clean up identities
+    dependsOn: SetupVM_and_RunTest_level3
+    condition: always()
+    timeoutInMinutes: 2
+    variables:
+      deviceLvl5DeviceId: $[ dependencies.setup_vm_level5.outputs['createIdentity.parentDeviceId'] ]
+      deviceLvl4DeviceId: $[ dependencies.setup_vm_level4.outputs['createIdentity.parentDeviceId'] ]
+      deviceLvl5IoTHubName: $[ dependencies.setup_vm_level5.outputs['createIdentity.iotHubName'] ]
+      deviceLvl4IoTHubName: $[ dependencies.setup_vm_level4.outputs['createIdentity.iotHubName'] ]
+    pool:
+      name: $(pool.name)
+      demands:
+        - agent-group -equals $(agent.group)
+        - Agent.OS -equals Linux
+        - Agent.OSArchitecture -equals X64
+    steps:
+      - template: templates/nested-get-secrets.yaml
+      - template: templates/nested-clean-identity.yaml
+        parameters:
+          iotHubName: $(deviceLvl5IoTHubName)
+          deviceId: $(deviceLvl5DeviceId)
+          lvl: 5
+      - template: templates/nested-clean-identity.yaml
+        parameters:
+          iotHubName: $(deviceLvl4IoTHubName)
+          deviceId: $(deviceLvl4DeviceId)
+          lvl: 4
+
+
+
+
+
+
 
 ################################################################################
 - stage: Publish
