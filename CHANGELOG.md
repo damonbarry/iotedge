@@ -1,3 +1,7 @@
+# 1.5.9999 (2024-05-30)
+
+* Fake release!
+
 # 1.5.3 (2024-05-30)
 
 Only Docker images are updated in this release. The daemon remains at version 1.5.0.
