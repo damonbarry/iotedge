@@ -1,3 +1,7 @@
+# 1.2.9999 (2024-05-30)
+
+* Fake release!
+
 # 1.2.3 (2024-05-30)
 
 The following Docker images were updated because their base images changed:
