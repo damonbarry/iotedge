@@ -108,6 +108,7 @@ parts:
 
 apps:
   aziot-edged:
+    after: [ docker-proxy ]
     command-chain:
       - snap/command-chain/handle-exit-status-153.sh
       - snap/command-chain/make-socket-directory.sh
@@ -122,6 +123,7 @@ apps:
       - network-bind
       - system-observe
       - run-iotedge
+    restart-delay: 2s
   iotedge:
     command: usr/bin/iotedge
     plugs:
@@ -140,6 +142,7 @@ apps:
       - docker
       - network
       - network-bind
+    restart-delay: 2s
 
 hooks:
   configure:
