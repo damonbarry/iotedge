@@ -33,7 +33,6 @@ parameters:
   customEdgeHub.image: ''
   test.runtimeLogLevel: ''
   topology: ''
-  connectivity.nested: 'false'
 
 steps:
   - task: CopyFiles@2
@@ -59,10 +58,7 @@ steps:
     condition: and(succeeded(), eq(variables['run.flag'], 1))
     displayName: 'Generate device certificates'
     inputs:
-      ${{ if eq(parameters['connectivity.nested'], 'false') }}:
-        workingDirectory: "$(Agent.BuildDirectory)/../artifacts/${{ parameters['images.artifact.name'] }}/CACertificates"
-      ${{ if eq(parameters['connectivity.nested'], 'true') }}:
-        workingDirectory: "/certs"
+      workingDirectory: "$(Agent.BuildDirectory)/../artifacts/${{ parameters['images.artifact.name'] }}/CACertificates"
       targetType: inline
       script: |
         chmod +x certGen.sh
