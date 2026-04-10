@@ -97,7 +97,7 @@ function get_artifact_file() {
     case "$fileType" in
         'aziot_edge' ) filter="aziot-edge*.$PACKAGE_TYPE";;
         'aziot_is' ) filter="aziot-identity-service*.$PACKAGE_TYPE";;
-        'quickstart' ) filter="core-linux/IotEdgeQuickstart.linux*.tar.gz";;
+        'quickstart' ) filter="core-linux/IotEdgeQuickstart";;
         *) print_error "Unknown file type: $fileType"; exit 1;;
     esac
 
@@ -162,12 +162,8 @@ function prepare_test_from_artifacts() {
     rm -rf "$working_folder"
     mkdir -p "$working_folder"
 
-    echo 'Extract quickstart to working folder'
-    mkdir -p "$quickstart_working_folder"
-    tar -C "$quickstart_working_folder" -xzf "$(get_artifact_file "$E2E_TEST_DIR" quickstart)"
-
-    echo "Create federated token file for OIDC authentication to IoT Hub at $quickstart_working_folder/oidc.json"
-    echo "$AZURE_CLIENT_SECRET" > "$quickstart_working_folder/oidc.json"
+    echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
+    echo "$AZURE_CLIENT_SECRET" > "$working_folder/oidc.json"
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
     cp "$REPO_PATH/e2e_deployment_files/$DEPLOYMENT_FILE_NAME" "$deployment_working_file"
@@ -186,7 +182,7 @@ function prepare_test_from_artifacts() {
     sed -i -e "s@<UpstreamProtocol>@$UPSTREAM_PROTOCOL@g" "$deployment_working_file"
     sed -i -e "s@<AzureTenantId>@$AZURE_TENANT_ID@g" "$deployment_working_file"
     sed -i -e "s@<AzureClientId>@$AZURE_CLIENT_ID@g" "$deployment_working_file"
-    sed -i -e "s@<AzureFederatedTokenFile>@$quickstart_working_folder/oidc.json@g" "$deployment_working_file"
+    sed -i -e "s@<AzureFederatedTokenFile>@$working_folder/oidc.json@g" "$deployment_working_file"
 
     if [[ ! -z "$CUSTOM_EDGE_AGENT_IMAGE" ]]; then
         sed -i -e "s@\"image\":.*azureiotedge-agent:.*\"@\"image\": \"$CUSTOM_EDGE_AGENT_IMAGE\"@g" "$deployment_working_file"
@@ -668,7 +664,7 @@ function run_connectivity_test() {
     echo "Device CA private key=$DEVICE_CA_PRIVATE_KEY"
     echo "Trusted CA certs=$TRUSTED_CA_CERTS"
 
-    "$quickstart_working_folder/IotEdgeQuickstart" \
+    "$(get_artifact_file $E2E_TEST_DIR quickstart)" \
         -d "$device_id" \
         -a "$E2E_TEST_DIR/artifacts/" \
         --iothub-hostname "$IOT_HUB_HOSTNAME" \
@@ -793,7 +789,7 @@ function run_longhaul_test() {
         echo "ParentHostName=$PARENT_HOSTNAME"
         echo "ParentEdgeDevice=$PARENT_EDGE_DEVICE"
 
-        "$quickstart_working_folder/IotEdgeQuickstart" \
+        "$(get_artifact_file $E2E_TEST_DIR quickstart)" \
             -d "$device_id" \
             -a "$E2E_TEST_DIR/artifacts/" \
             --iothub-hostname "$IOT_HUB_HOSTNAME" \
@@ -820,7 +816,7 @@ function run_longhaul_test() {
             $BYPASS_EDGE_INSTALLATION \
             --no-verify && ret=$? || ret=$?
     else
-        "$quickstart_working_folder/IotEdgeQuickstart" \
+        "$(get_artifact_file $E2E_TEST_DIR quickstart)" \
             -d "$device_id" \
             -a "$E2E_TEST_DIR/artifacts/" \
             --iothub-hostname "$IOT_HUB_HOSTNAME" \
@@ -947,7 +943,6 @@ TWIN_UPDATE_FAILURE_THRESHOLD="${TWIN_UPDATE_FAILURE_THRESHOLD:-00:02:00}"
 NETWORK_CONTROLLER_FREQUENCIES=${NETWORK_CONTROLLER_FREQUENCIES:(null)}
 
 working_folder="$E2E_TEST_DIR/working"
-quickstart_working_folder="$working_folder/quickstart"
 
 if [ -z $PACKAGE_TYPE ]; then
     echo 'Package type not specifed default to .deb'

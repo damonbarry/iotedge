@@ -193,13 +193,7 @@ jobs:
           downloadPath: '$(Build.StagingDirectory)'
           artifactName: $(images.artifact.name.linux)
           allowPartiallySucceededBuilds: true
-          itemPattern: |
-            $(images.artifact.name.linux)/IotEdgeQuickstart.linux-x64.tar.gz
-            $(images.artifact.name.linux)/e2e_deployment_files/$(deploymentFileName)
-            $(images.artifact.name.linux)/scripts/linux/trcE2ETest.sh
-            $(images.artifact.name.linux)/artifactInfo.txt
-            $(images.artifact.name.linux)/CACertificates/certGen.sh
-            $(images.artifact.name.linux)/CACertificates/openssl_root_ca.cnf
+          itemPattern: $(images.artifact.name.linux)/artifactInfo.txt
       # Deploy connectivity test
       - template: templates/connectivity-deploy.yaml
         parameters:
