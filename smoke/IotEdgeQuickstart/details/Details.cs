@@ -239,7 +239,12 @@ namespace IotEdgeQuickstart.Details
             this.proxy.ForEach(p => settings.Proxy = p);
             RegistryManager rm = RegistryManager.Create(this.iothubHostName, new AzureCliCredential(), settings);
 
-            Device device = await rm.GetDeviceAsync(this.deviceId);
+            var retryStrategy = new Incremental(15, RetryStrategy.DefaultRetryInterval, RetryStrategy.DefaultRetryIncrement);
+            var retryPolicy = new RetryPolicy(new TransientNetworkErrorDetectionStrategy(), retryStrategy);
+
+            Device device = await retryPolicy.ExecuteAsync(
+                () => rm.GetDeviceAsync(this.deviceId),
+                new CancellationTokenSource(TimeSpan.FromMinutes(10)).Token);
             if (device != null)
             {
                 Console.WriteLine($"Device '{device.Id}' already registered on IoT hub '{this.iothubHostName}'");
@@ -629,7 +634,7 @@ namespace IotEdgeQuickstart.Details
     {
         public bool IsTransient(Exception ex)
         {
-            return ex is IotHubCommunicationException && ex.Message.Contains("The POST operation timed out");
+            return ex is IotHubCommunicationException;
         }
     }
 
