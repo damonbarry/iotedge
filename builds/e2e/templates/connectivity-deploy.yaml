@@ -69,6 +69,43 @@ steps:
     condition: and(succeeded(), eq(variables['run.flag'], 1))
     displayName: Generate device certificates
     workingDirectory: '$(Build.SourcesDirectory)/tools/CACertificates'
+  
+  - bash: |
+      mkdir -p iot-service-sdk-test
+      cd iot-service-sdk-test
+
+      cat > Program.cs << 'EOF'
+      using Azure.Identity;
+      using Microsoft.Azure.Devices;
+
+      var hostname = "${{ parameters['iotHub.hostName']}}";
+      var settings = new HttpTransportSettings();
+      RegistryManager rm = RegistryManager.Create(hostname, new AzureCliCredential(), settings);
+
+      var query = rm.CreateQuery("select * from devices", 10);
+      var devices = await query.GetNextAsJsonAsync();
+      Console.WriteLine($"Devices: {devices}");
+      EOF
+
+      cat > iot-service-sdk-test.csproj << 'EOF'
+      <Project Sdk="Microsoft.NET.Sdk">
+        <PropertyGroup>
+          <OutputType>Exe</OutputType>
+          <TargetFramework>net8.0</TargetFramework>
+          <RootNamespace>iot_service_sdk_test</RootNamespace>
+          <ImplicitUsings>enable</ImplicitUsings>
+          <Nullable>enable</Nullable>
+        </PropertyGroup>
+        <ItemGroup>
+          <PackageReference Include="Azure.Identity" Version="1.17.1" />
+          <PackageReference Include="Microsoft.Azure.Devices" Version="1.41.0" />
+        </ItemGroup>
+      </Project>
+      EOF
+
+      dotnet run --project iot-service-sdk-test.csproj
+    displayName: Try to use the IoT Hub Service SDK
+    condition: and(succeeded(), eq(variables['run.flag'], 1))
         
   - task: AzureCLI@2
     condition: and(succeeded(), eq(variables['run.flag'], 1))
