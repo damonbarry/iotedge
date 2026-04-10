@@ -90,8 +90,12 @@ steps:
         RegistryManager rm = RegistryManager.Create(hostname, new AzureCliCredential(), settings);
 
         var query = rm.CreateQuery("select * from devices", 10);
-        var devices = await query.GetNextAsJsonAsync();
-        Console.WriteLine(string.Join(Environment.NewLine, devices));
+        var twins = await query.GetNextAsTwinAsync();
+        foreach (var twin in twins)
+        {
+            var device = await rm.GetDeviceAsync(twin.DeviceId);
+            Console.WriteLine($"Device ID: {device.Id}, Status: {device.Status}, ETag: {device.ETag}");
+        }
         EOF
 
         cat > iot-service-sdk-test.csproj << 'EOF'
