@@ -84,7 +84,7 @@ steps:
 
       var query = rm.CreateQuery("select * from devices", 10);
       var devices = await query.GetNextAsJsonAsync();
-      Console.WriteLine($"Devices: {devices}");
+      Console.WriteLine(string.Join(Environment.NewLine, devices));
       EOF
 
       cat > iot-service-sdk-test.csproj << 'EOF'
