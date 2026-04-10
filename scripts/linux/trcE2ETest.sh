@@ -607,6 +607,8 @@ function process_args() {
 }
 
 function validate_test_parameters() {
+    print_highlighted_message "Dump artifacts directory for debugging"
+    ls -lR "$E2E_TEST_DIR/artifacts"
     print_highlighted_message "Validate test parameters"
     echo "aziot_edge: $(get_artifact_file $E2E_TEST_DIR aziot_edge)"
     echo "aziot_identity_service: $(get_artifact_file $E2E_TEST_DIR aziot_is)"
