@@ -391,6 +391,9 @@
               "verificationDelay": {
                 "value": "<TestResultCoordinator.VerificationDelay>"
               },
+              "eventHubName": {
+                "value": "<TestResultCoordinator.EventHubName>"
+              },
               "eventHubNamespace": {
                 "value": "<TestResultCoordinator.EventHubNamespace>"
               },
