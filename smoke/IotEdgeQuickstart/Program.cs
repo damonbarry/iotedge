@@ -23,7 +23,7 @@ Environment Variables:
 
   Option                        Environment variable
   --bootstrapper-archive        bootstrapperArchivePath
-  --fully-qualified-namespace   fullyQualifiedNamespace
+  --event-hub-namespace         eventHubNamespace
   --event-hub-name              eventHubName
   --iothub-hostname             iothubHostName
   --password                    registryPassword
@@ -42,7 +42,7 @@ Defaults:
   --bootstrapper-archive                no path (archive is installed from apt or pypi)
   --device-id                           an auto-generated unique identifier
   --edge-hostname                       'quickstart'
-  --fully-qualified-namespace           get the value from Key Vault
+  --event-hub-namespace                 get the value from Key Vault
   --event-hub-name                      get the value from Key Vault
   --initialize-with-agent-artifact      false
   --iothub-hostname                     get the value from Key Vault
@@ -80,8 +80,8 @@ Defaults:
         [Option("--event-hub-name <value>", Description = "Event Hub name")]
         public string EventHubName { get; } = Environment.GetEnvironmentVariable("eventHubName");
 
-        [Option("--fully-qualified-namespace <value>", Description = "Fully qualified namespace for Event Hub")]
-        public string FullyQualifiedNamespace { get; } = Environment.GetEnvironmentVariable("fullyQualifiedNamespace");
+        [Option("--event-hub-namespace <value>", Description = "Fully qualified Event Hub namespace")]
+        public string EventHubNamespace { get; } = Environment.GetEnvironmentVariable("eventHubNamespace");
 
         [Option("-h|--use-http=<hostname>", Description = "Modules talk to iotedged via tcp instead of unix domain socket")]
         public (bool useHttp, string hostname) UseHttp { get; } = (false, string.Empty);
@@ -306,8 +306,8 @@ Defaults:
                 string eventHubName = this.EventHubName ??
                                   await SecretsHelper.GetSecretFromConfigKey("eventHubName");
 
-                string fullyQualifiedNamespace = this.FullyQualifiedNamespace ??
-                                  await SecretsHelper.GetSecretFromConfigKey("fullyQualifiedNamespace");
+                string eventHubNamespace = this.EventHubNamespace ??
+                                  await SecretsHelper.GetSecretFromConfigKey("eventHubNamespace");
 
                 Option<string> deployment = this.DeploymentFileName != null ? Option.Some(this.DeploymentFileName) : Option.None<string>();
 
@@ -319,7 +319,7 @@ Defaults:
                     bootstrapper,
                     credentials,
                     eventHubName,
-                    fullyQualifiedNamespace,
+                    eventHubNamespace,
                     iothubHostName,
                     this.UpstreamProtocol.Item2,
                     proxy,

@@ -668,7 +668,7 @@ function run_connectivity_test() {
         -d "$device_id" \
         -a "$E2E_TEST_DIR/artifacts/" \
         --iothub-hostname "$IOT_HUB_HOSTNAME" \
-        --fully-qualified-namespace "$EVENTHUB_NAMESPACE" \
+        --event-hub-namespace "$EVENTHUB_NAMESPACE" \
         --event-hub-name "$EVENTHUB_NAME" \
         -r "$CONTAINER_REGISTRY" \
         -u "$CONTAINER_REGISTRY_USERNAME" \
@@ -793,7 +793,7 @@ function run_longhaul_test() {
             -d "$device_id" \
             -a "$E2E_TEST_DIR/artifacts/" \
             --iothub-hostname "$IOT_HUB_HOSTNAME" \
-            --fully-qualified-namespace "$EVENTHUB_NAMESPACE" \
+            --event-hub-namespace "$EVENTHUB_NAMESPACE" \
             --event-hub-name "$EVENTHUB_NAME" \
             -r "$CONTAINER_REGISTRY" \
             -u "$CONTAINER_REGISTRY_USERNAME" \
@@ -820,7 +820,7 @@ function run_longhaul_test() {
             -d "$device_id" \
             -a "$E2E_TEST_DIR/artifacts/" \
             --iothub-hostname "$IOT_HUB_HOSTNAME" \
-            --fully-qualified-namespace "$EVENTHUB_NAMESPACE" \
+            --event-hub-namespace "$EVENTHUB_NAMESPACE" \
             --event-hub-name "$EVENTHUB_NAME" \
             -r "$CONTAINER_REGISTRY" \
             -u "$CONTAINER_REGISTRY_USERNAME" \

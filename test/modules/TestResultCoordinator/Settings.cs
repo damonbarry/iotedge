@@ -32,7 +32,7 @@ namespace TestResultCoordinator
             string trackingId,
             bool useTestResultReportingService,
             bool useResultEventReceivingService,
-            string fullyQualifiedNamespace,
+            string eventHubNamespace,
             string eventHubName,
             string iotHubHostname,
             string deviceId,
@@ -64,7 +64,7 @@ namespace TestResultCoordinator
             {
                 this.TestResultEventReceivingServiceSettings = Option.Some(new TestResultEventReceivingServiceSettings()
                 {
-                    FullyQualifiedNamespace = Preconditions.CheckNonWhiteSpace(fullyQualifiedNamespace, nameof(fullyQualifiedNamespace)),
+                    EventHubNamespace = Preconditions.CheckNonWhiteSpace(eventHubNamespace, nameof(eventHubNamespace)),
                     EventHubName = Preconditions.CheckNonWhiteSpace(eventHubName, nameof(eventHubName)),
                     ConsumerGroupName = "$Default"
                 });
@@ -152,7 +152,7 @@ namespace TestResultCoordinator
                 configuration.GetValue<string>("trackingId"),
                 configuration.GetValue("useTestResultReportingService", true),
                 configuration.GetValue("useResultEventReceivingService", true),
-                configuration.GetValue<string>("fullyQualifiedNamespace"),
+                configuration.GetValue<string>("eventHubNamespace"),
                 configuration.GetValue<string>("eventHubName"),
                 configuration.GetValue<string>("IOT_HUB_HOSTNAME"),
                 configuration.GetValue<string>("IOTEDGE_DEVICEID"),
@@ -238,7 +238,7 @@ namespace TestResultCoordinator
 
             this.TestResultEventReceivingServiceSettings.ForEach(settings =>
             {
-                fields.Add(nameof(settings.FullyQualifiedNamespace), settings.FullyQualifiedNamespace);
+                fields.Add(nameof(settings.EventHubNamespace), settings.EventHubNamespace);
                 fields.Add(nameof(settings.EventHubName), settings.EventHubName);
                 fields.Add(nameof(settings.ConsumerGroupName), settings.ConsumerGroupName);
             });
@@ -285,7 +285,7 @@ namespace TestResultCoordinator
 
     internal struct TestResultEventReceivingServiceSettings
     {
-        public string FullyQualifiedNamespace;
+        public string EventHubNamespace;
         public string EventHubName;
         public string ConsumerGroupName;
     }

@@ -114,7 +114,7 @@ namespace IotEdgeQuickstart.Details
 
         readonly string eventHubName;
 
-        readonly string fullyQualifiedNamespace;
+        readonly string eventHubNamespace;
 
         readonly string iothubHostName;
 
@@ -154,7 +154,7 @@ namespace IotEdgeQuickstart.Details
             IBootstrapper bootstrapper,
             Option<RegistryCredentials> credentials,
             string eventHubName,
-            string fullyQualifiedNamespace,
+            string eventHubNamespace,
             string iothubHostName,
             UpstreamProtocolType upstreamProtocol,
             Option<string> proxy,
@@ -177,7 +177,7 @@ namespace IotEdgeQuickstart.Details
             this.bootstrapper = bootstrapper;
             this.credentials = credentials;
             this.eventHubName = eventHubName;
-            this.fullyQualifiedNamespace = fullyQualifiedNamespace;
+            this.eventHubNamespace = eventHubNamespace;
             this.iothubHostName = iothubHostName;
             this.dpsAttestation = dpsAttestation;
 
@@ -385,7 +385,7 @@ namespace IotEdgeQuickstart.Details
 
             var consumer = new EventHubConsumerClient(
                 EventHubConsumerClient.DefaultConsumerGroupName,
-                this.fullyQualifiedNamespace,
+                this.eventHubNamespace,
                 this.eventHubName,
                 new AzureCliCredential(),
                 consumerOptions);
@@ -396,7 +396,7 @@ namespace IotEdgeQuickstart.Details
                 EventHubConsumerClient.DefaultConsumerGroupName,
                 EventHubPartitionKeyResolver.ResolveToPartition(this.context.DeviceId, numPartitions),
                 EventPosition.FromEnqueuedTime(dataEnqueuedFrom),
-                this.fullyQualifiedNamespace,
+                this.eventHubNamespace,
                 this.eventHubName,
                 new AzureCliCredential());
 

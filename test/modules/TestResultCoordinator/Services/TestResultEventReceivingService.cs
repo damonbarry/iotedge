@@ -41,7 +41,7 @@ namespace TestResultCoordinator.Services
 
             var consumer = new EventHubConsumerClient(
                 EventHubConsumerClient.DefaultConsumerGroupName,
-                this.serviceSpecificSettings.FullyQualifiedNamespace,
+                this.serviceSpecificSettings.EventHubNamespace,
                 this.serviceSpecificSettings.EventHubName,
                 new AzureCliCredential());
             int numPartitions = (await consumer.GetPartitionIdsAsync()).Length;
@@ -51,7 +51,7 @@ namespace TestResultCoordinator.Services
                 this.serviceSpecificSettings.ConsumerGroupName,
                 EventHubPartitionKeyResolver.ResolveToPartition(Settings.Current.DeviceId, numPartitions),
                 EventPosition.FromEnqueuedTime(eventEnqueuedFrom),
-                this.serviceSpecificSettings.FullyQualifiedNamespace,
+                this.serviceSpecificSettings.EventHubNamespace,
                 this.serviceSpecificSettings.EventHubName,
                 new AzureCliCredential());
             var handler = new PartitionReceiveHandler(Settings.Current.TrackingId, Settings.Current.DeviceId, this.storage);
