@@ -40,41 +40,52 @@ namespace TestResultCoordinator.Services
             DateTime eventEnqueuedFrom = DateTime.UtcNow;
 
             var consumer = new EventHubConsumerClient(
-                EventHubConsumerClient.DefaultConsumerGroupName,
+                this.serviceSpecificSettings.ConsumerGroupName,
                 this.serviceSpecificSettings.EventHubNamespace,
                 this.serviceSpecificSettings.EventHubName,
                 new WorkloadIdentityCredential());
             int numPartitions = (await consumer.GetPartitionIdsAsync()).Length;
             await consumer.CloseAsync();
 
-            var receiver = new PartitionReceiver(
-                this.serviceSpecificSettings.ConsumerGroupName,
-                EventHubPartitionKeyResolver.ResolveToPartition(Settings.Current.DeviceId, numPartitions),
-                EventPosition.FromEnqueuedTime(eventEnqueuedFrom),
-                this.serviceSpecificSettings.EventHubNamespace,
-                this.serviceSpecificSettings.EventHubName,
-                new WorkloadIdentityCredential());
             var handler = new PartitionReceiveHandler(Settings.Current.TrackingId, Settings.Current.DeviceId, this.storage);
 
-            this.logger.LogDebug($"Receiving events from device '{Settings.Current.DeviceId}' on Event Hub '{this.serviceSpecificSettings.EventHubName}' enqueued on or after {eventEnqueuedFrom}");
-
-            try
+            while (!cancellationToken.IsCancellationRequested)
             {
-                while (!cancellationToken.IsCancellationRequested)
+                var receiver = new PartitionReceiver(
+                    this.serviceSpecificSettings.ConsumerGroupName,
+                    EventHubPartitionKeyResolver.ResolveToPartition(Settings.Current.DeviceId, numPartitions),
+                    EventPosition.FromEnqueuedTime(eventEnqueuedFrom),
+                    this.serviceSpecificSettings.EventHubNamespace,
+                    this.serviceSpecificSettings.EventHubName,
+                    new WorkloadIdentityCredential());
+
+                this.logger.LogDebug($"Receiving events from device '{Settings.Current.DeviceId}' on Event Hub '{this.serviceSpecificSettings.EventHubName}' enqueued on or after {eventEnqueuedFrom}");
+
+                try
                 {
-                    var batch = await receiver.ReceiveBatchAsync(50, cancellationToken);
-                    await handler.ProcessEventsAsync(batch);
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var batch = await receiver.ReceiveBatchAsync(50, cancellationToken);
+                        await handler.ProcessEventsAsync(batch);
+                    }
+                }
+                catch (Azure.Messaging.EventHubs.EventHubsException e) when (e.IsTransient)
+                {
+                    this.logger.LogWarning(e, "Transient Event Hubs error; recreating receiver.");
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    // This is expected when the service is stopping.
+                    break;
+                }
+                finally
+                {
+                    await receiver.CloseAsync();
                 }
             }
-            catch (TaskCanceledException)
-            {
-                // This is expected when the service is stopping.
-            }
-            finally
-            {
-                await receiver.CloseAsync();
-                this.logger.LogInformation($"Finish ExecuteAsync method in {nameof(TestResultEventReceivingService)}");
-            }
+
+            this.logger.LogInformation($"Finish ExecuteAsync method in {nameof(TestResultEventReceivingService)}");
         }
     }
 }
