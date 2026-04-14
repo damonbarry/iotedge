@@ -156,7 +156,7 @@ function refresh_oidc_token_loop() {
     local service_connection_id=$(curl -s \
         "${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/serviceendpoint/endpoints?api-version=7.1-preview.4" \
         -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN" | \
-        jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.serviceprincipalid==$cid) | .id' 2>/dev/null | head -1)
+        jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.servicePrincipalId==$cid) | .id' 2>/dev/null | head -1)
 
     if [[ -z "$service_connection_id" ]]; then
         print_error "OIDC token refresh: could not find service connection for client '$AZURE_CLIENT_ID'. Token will not be refreshed."
