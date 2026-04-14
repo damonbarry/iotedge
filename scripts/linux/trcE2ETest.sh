@@ -145,6 +145,58 @@ function stop_aziot_edge() {
     systemctl stop aziot-keyd aziot-certd aziot-identityd aziot-edged || true
 }
 
+TOKEN_REFRESH_PID=''
+
+function refresh_oidc_token_loop() {
+    local token_file="$1"
+    local interval_secs=2700  # 45 minutes
+
+    # Look up the service connection ID by matching the client ID used by this run.
+    # AZURE_CLIENT_ID is set during process_args from the -clientId argument.
+    local service_connection_id=$(curl -s \
+        "${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/serviceendpoint/endpoints?api-version=7.1-preview.4" \
+        -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN" | \
+        jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.serviceprincipalid==$cid) | .id' 2>/dev/null | head -1)
+
+    if [[ -z "$service_connection_id" ]]; then
+        print_error "OIDC token refresh: could not find service connection for client '$AZURE_CLIENT_ID'. Token will not be refreshed."
+        return
+    fi
+
+    print_highlighted_message "OIDC token refresh loop started (interval: ${interval_secs}s, service connection: $service_connection_id)"
+
+    while true; do
+        sleep "$interval_secs"
+
+        local new_token=$(curl -s -X POST \
+            "${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/distributedtask/hubs/build/plans/${SYSTEM_PLANID}/jobs/${SYSTEM_JOBID}/oidctoken?serviceConnectionId=${service_connection_id}&api-version=7.1-preview.1" \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN" | \
+            jq -r '.oidcToken' 2>/dev/null)
+
+        if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
+            echo "$new_token" > "$token_file"
+            print_highlighted_message "OIDC token refreshed at $(date)"
+        else
+            print_error "OIDC token refresh failed at $(date)"
+        fi
+    done
+}
+
+function start_token_refresh() {
+    local token_file="$1"
+    refresh_oidc_token_loop "$token_file" &
+    TOKEN_REFRESH_PID=$!
+    print_highlighted_message "OIDC token refresh background process started (PID: $TOKEN_REFRESH_PID)"
+}
+
+function stop_token_refresh() {
+    if [[ -n "$TOKEN_REFRESH_PID" ]]; then
+        kill "$TOKEN_REFRESH_PID" 2>/dev/null || true
+        TOKEN_REFRESH_PID=''
+    fi
+}
+
 function parse_result() {
     found_test_passed="$(docker logs testResultCoordinator 2>&1 | sed -n '/Test summary/,/"TestResultReports"/p' | grep '"IsPassed": true')"
 
@@ -164,6 +216,7 @@ function prepare_test_from_artifacts() {
 
     echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
     echo "$AZURE_CLIENT_SECRET" > "$working_folder/oidc.json"
+    start_token_refresh "$working_folder/oidc.json"
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
     cp "$REPO_PATH/e2e_deployment_files/$DEPLOYMENT_FILE_NAME" "$deployment_working_file"
@@ -262,6 +315,8 @@ function prepare_test_from_artifacts() {
 
 function clean_up() {
     print_highlighted_message 'Clean up'
+
+    stop_token_refresh || true
 
     # TODO: Need to fix this script to deploy correct iotedge artifact.
     # Because it deploys iotedge installed from apt, we need to stop 1.0.10 service.
