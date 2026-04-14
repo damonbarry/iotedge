@@ -133,7 +133,8 @@ steps:
           -cleanAll \
           -tenantId "$tenantId" \
           -clientId "$servicePrincipalId" \
-          -clientSecret "$idToken"
+          -clientSecret "$idToken" \
+          -serviceConnectionId "$AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
 
         scriptExitCode=$?
         echo "script exit code=$scriptExitCode"

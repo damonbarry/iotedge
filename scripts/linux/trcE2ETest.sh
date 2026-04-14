@@ -149,33 +149,8 @@ TOKEN_REFRESH_PID=''
 
 function refresh_oidc_token_loop() {
     local token_file="$1"
+    local service_connection_id="$2"
     local interval_secs=2700  # 45 minutes
-
-    # Look up the service connection ID by matching the client ID used by this run.
-    # AZURE_CLIENT_ID is set during process_args from the -clientId argument.
-    local endpoints_url="${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/serviceendpoint/endpoints?api-version=7.1-preview.4"
-    print_highlighted_message "OIDC token refresh: querying service endpoints at $endpoints_url"
-
-    local endpoints_response
-    endpoints_response=$(curl -s \
-        "$endpoints_url" \
-        -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN")
-
-    # Log the auth parameter keys present in the first endpoint to diagnose field name mismatches
-    local endpoint_count=$(echo "$endpoints_response" | jq -r '.value | length' 2>/dev/null)
-    print_highlighted_message "OIDC token refresh: got $endpoint_count endpoint(s)"
-
-    # Log name, type, and auth parameter keys for every endpoint
-    echo "$endpoints_response" | jq -r '.value[] | "  endpoint: \(.name) type=\(.type) params=[\(.authorization.parameters | keys | join(", "))]"' 2>/dev/null | \
-        while IFS= read -r line; do print_highlighted_message "OIDC token refresh: $line"; done
-
-    local service_connection_id=$(echo "$endpoints_response" | \
-        jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.servicePrincipalId==$cid) | .id' 2>/dev/null | head -1)
-
-    if [[ -z "$service_connection_id" ]]; then
-        print_error "OIDC token refresh: could not find service connection for client '$AZURE_CLIENT_ID'. Token will not be refreshed."
-        return
-    fi
 
     print_highlighted_message "OIDC token refresh loop started (interval: ${interval_secs}s, service connection: $service_connection_id)"
 
@@ -199,7 +174,11 @@ function refresh_oidc_token_loop() {
 
 function start_token_refresh() {
     local token_file="$1"
-    refresh_oidc_token_loop "$token_file" &
+    if [[ -z "$SERVICE_CONNECTION_ID" ]]; then
+        print_error "OIDC token refresh: SERVICE_CONNECTION_ID is not set. Token will not be refreshed."
+        return
+    fi
+    refresh_oidc_token_loop "$token_file" "$SERVICE_CONNECTION_ID" &
     TOKEN_REFRESH_PID=$!
     print_highlighted_message "OIDC token refresh background process started (PID: $TOKEN_REFRESH_PID)"
 }
@@ -576,6 +555,9 @@ function process_args() {
         elif [ $saveNextArg -eq 52 ]; then
             AZURE_CLIENT_SECRET="$arg"
             saveNextArg=0
+        elif [ $saveNextArg -eq 54 ]; then
+            SERVICE_CONNECTION_ID="$arg"
+            saveNextArg=0
         else
             case "$arg" in
                 '-h' | '--help' ) usage;;
@@ -634,6 +616,7 @@ function process_args() {
                 '-tenantId' ) saveNextArg=50;;
                 '-clientId' ) saveNextArg=51;;
                 '-clientSecret' ) saveNextArg=52;;
+                '-serviceConnectionId' ) saveNextArg=54;;
 
                 * )
                     echo "Unsupported argument: $saveNextArg $arg"
