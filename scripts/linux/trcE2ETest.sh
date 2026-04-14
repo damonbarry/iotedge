@@ -162,8 +162,12 @@ function refresh_oidc_token_loop() {
         -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN")
 
     # Log the auth parameter keys present in the first endpoint to diagnose field name mismatches
-    local auth_param_keys=$(echo "$endpoints_response" | jq -r '[.value[0].authorization.parameters | keys[]?] | join(", ")' 2>/dev/null)
-    print_highlighted_message "OIDC token refresh: auth parameter keys in first endpoint: [$auth_param_keys]"
+    local endpoint_count=$(echo "$endpoints_response" | jq -r '.value | length' 2>/dev/null)
+    print_highlighted_message "OIDC token refresh: got $endpoint_count endpoint(s)"
+
+    # Log name, type, and auth parameter keys for every endpoint
+    echo "$endpoints_response" | jq -r '.value[] | "  endpoint: \(.name) type=\(.type) params=[\(.authorization.parameters | keys | join(", "))]"' 2>/dev/null | \
+        while IFS= read -r line; do print_highlighted_message "OIDC token refresh: $line"; done
 
     local service_connection_id=$(echo "$endpoints_response" | \
         jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.servicePrincipalId==$cid) | .id' 2>/dev/null | head -1)
