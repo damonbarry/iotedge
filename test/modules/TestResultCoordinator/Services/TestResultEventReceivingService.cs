@@ -43,7 +43,7 @@ namespace TestResultCoordinator.Services
                 EventHubConsumerClient.DefaultConsumerGroupName,
                 this.serviceSpecificSettings.EventHubNamespace,
                 this.serviceSpecificSettings.EventHubName,
-                new AzureCliCredential());
+                new WorkloadIdentityCredential());
             int numPartitions = (await consumer.GetPartitionIdsAsync()).Length;
             await consumer.CloseAsync();
 
@@ -53,7 +53,7 @@ namespace TestResultCoordinator.Services
                 EventPosition.FromEnqueuedTime(eventEnqueuedFrom),
                 this.serviceSpecificSettings.EventHubNamespace,
                 this.serviceSpecificSettings.EventHubName,
-                new AzureCliCredential());
+                new WorkloadIdentityCredential());
             var handler = new PartitionReceiveHandler(Settings.Current.TrackingId, Settings.Current.DeviceId, this.storage);
 
             this.logger.LogDebug($"Receiving events from device '{Settings.Current.DeviceId}' on Event Hub '{this.serviceSpecificSettings.EventHubName}' enqueued on or after {eventEnqueuedFrom}");
