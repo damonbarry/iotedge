@@ -153,9 +153,19 @@ function refresh_oidc_token_loop() {
 
     # Look up the service connection ID by matching the client ID used by this run.
     # AZURE_CLIENT_ID is set during process_args from the -clientId argument.
-    local service_connection_id=$(curl -s \
-        "${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/serviceendpoint/endpoints?api-version=7.1-preview.4" \
-        -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN" | \
+    local endpoints_url="${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/serviceendpoint/endpoints?api-version=7.1-preview.4"
+    print_highlighted_message "OIDC token refresh: querying service endpoints at $endpoints_url"
+
+    local endpoints_response
+    endpoints_response=$(curl -s \
+        "$endpoints_url" \
+        -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN")
+
+    # Log the auth parameter keys present in the first endpoint to diagnose field name mismatches
+    local auth_param_keys=$(echo "$endpoints_response" | jq -r '[.value[0].authorization.parameters | keys[]?] | join(", ")' 2>/dev/null)
+    print_highlighted_message "OIDC token refresh: auth parameter keys in first endpoint: [$auth_param_keys]"
+
+    local service_connection_id=$(echo "$endpoints_response" | \
         jq -r --arg cid "$AZURE_CLIENT_ID" '.value[] | select(.authorization.parameters.servicePrincipalId==$cid) | .id' 2>/dev/null | head -1)
 
     if [[ -z "$service_connection_id" ]]; then
