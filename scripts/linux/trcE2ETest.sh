@@ -63,14 +63,14 @@ function usage() {
 }
 
 function print_error() {
-    local message=$1
+    local message="$1"
     local red='\033[0;31m'
     local color_reset='\033[0m'
     echo -e "${red}$message${color_reset}"
 }
 
 function print_highlighted_message() {
-    local message=$1
+    local message="$1"
     local cyan='\033[0;36m'
     local color_reset='\033[0m'
     echo -e "${cyan}$message${color_reset}"
