@@ -218,7 +218,6 @@ function prepare_test_from_artifacts() {
     echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
     refresh_oidc_token "$working_folder/oidc.json" "$OIDC_REQUEST_URI" "$SERVICE_CONNECTION_ID" "$DEVOPS_ACCESS_TOKEN"
     start_token_refresh "$working_folder/oidc.json"
-    trap stop_token_refresh EXIT # kill the token refresh background process when the script exits
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
     cp "$REPO_PATH/e2e_deployment_files/$DEPLOYMENT_FILE_NAME" "$deployment_working_file"
@@ -981,6 +980,8 @@ function configure_connectivity_settings() {
 
 LONGHAUL_TEST_NAME="LongHaul"
 CONNECTIVITY_TEST_NAME="Connectivity"
+
+trap stop_token_refresh EXIT
 
 is_build_canceled=$(is_cancel_build_requested $DEVOPS_ACCESS_TOKEN $DEVOPS_BUILDID)
 if [ "$is_build_canceled" -eq '1' ]; then
