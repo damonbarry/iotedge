@@ -153,7 +153,8 @@ function refresh_oidc_token() {
     local devops_access_token="$4"
     local stderr_file=$(mktemp)
 
-    local response=$(curl \
+    local response
+    response=$(curl \
         --fail \
         --show-error \
         --silent \
@@ -162,7 +163,9 @@ function refresh_oidc_token() {
         --request POST \
         "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
         2>"$stderr_file")
-    if [[ $? -ne 0 ]]; then
+    local curl_exit=$?
+    print_highlighted_message "curl exit code: $curl_exit"
+    if [[ $curl_exit -ne 0 ]]; then
         print_error "OIDC token refresh failed at $(date):"
         print_error "$(cat "$stderr_file")"
         rm -f "$stderr_file"
