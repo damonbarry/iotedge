@@ -161,7 +161,7 @@ function refresh_oidc_token() {
         "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
         2>&1)
     if [[ $? -ne 0 ]]; then
-        print_error "OIDC token refresh failed at $(date)\n$response"
+        print_error "OIDC token refresh failed at $(date): $response"
         exit 1
     fi
 
@@ -170,7 +170,7 @@ function refresh_oidc_token() {
         echo "$new_token" > "$token_file"
         print_highlighted_message "OIDC token refreshed at $(date)"
     else
-        print_error "OIDC token refresh failed at $(date)\nNo token in response"
+        print_error "OIDC token refresh failed at $(date): No token in response"
         exit 1
     fi
 }
