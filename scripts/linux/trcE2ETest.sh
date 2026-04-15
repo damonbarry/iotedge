@@ -163,6 +163,7 @@ function refresh_oidc_token() {
         print_highlighted_message "OIDC token refreshed at $(date)"
     else
         print_error "OIDC token refresh failed at $(date)"
+        exit 1
     fi
 }
 
