@@ -37,16 +37,6 @@ jobs:
       demands:
         - ImageOverride -equals agent-aziotedge-ubuntu-22.04-msmoby
     steps:
-      - task: AzureCLI@2
-        displayName: 'Dump OIDC variables'
-        inputs:
-          addSpnToEnvironment: true
-          azureSubscription: '$(azure.subscription)'
-          scriptType: bash
-          scriptLocation: inlineScript
-          inlineScript: |
-            echo "System.OidcRequestUri: $SYSTEM_OIDCREQUESTURI"
-            echo "AZURESUBSCRIPTION_SERVICE_CONNECTION_ID: $AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
       - template: templates/storage-token.yaml
         parameters:
           azureSubscription: $(azure.subscription)
