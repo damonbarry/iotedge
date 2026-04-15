@@ -155,6 +155,7 @@ function refresh_oidc_token() {
         --fail \
         --show-error \
         --silent \
+        --header 'Content-Length: 0' \
         --header 'Content-Type: application/json' \
         --header "Authorization: bearer $devops_access_token" \
         --request POST \
