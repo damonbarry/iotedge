@@ -152,11 +152,25 @@ function refresh_oidc_token() {
     local service_connection_id="$3"
     local devops_access_token="$4"
 
-    local new_token=$(curl -s -X POST \
+    local result=$(curl \
+        --show-error \
+        --silent \
+        --write-out '\n%{http_code}' \
+        --header 'Content-Type: application/json' \
+        --header "Authorization: bearer $devops_access_token" \
+        --request POST \
         "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
-        -H 'Content-Type: application/json' \
-        -H "Authorization: bearer $devops_access_token" | \
-        jq -r '.oidcToken' 2>/dev/null)
+        2>/dev/null)
+    local status=$(echo "$result" | tail -n 1)
+    result="$(echo "$result" | head -n -1)"
+
+    print_highlighted_message "OIDC token refresh request returned: $status"
+
+    local new_token
+    if [[ "$status" -lt 300 ]]; then
+        print_highlighted_message "Response keys: $(echo "$result" | jq -r 'keys[]')"
+        new_token=$(echo "$result" | jq -r '.oidcToken')
+    fi
 
     if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
         echo "$new_token" > "$token_file"
