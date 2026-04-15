@@ -153,8 +153,7 @@ function refresh_oidc_token() {
     local devops_access_token="$4"
     local stderr_file=$(mktemp)
 
-    local response
-    response=$(curl \
+    local response=$(curl \
         --fail \
         --show-error \
         --silent \
