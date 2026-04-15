@@ -149,7 +149,6 @@ function refresh_oidc_token() {
     local oidc_request_uri="$2"
     local service_connection_id="$3"
     local devops_access_token="$4"
-    local stderr_file=$(mktemp)
 
     local response # assignment on same line as local decl causes curl exit code to be lost
     response=$(curl \
@@ -160,22 +159,18 @@ function refresh_oidc_token() {
         --header "Authorization: bearer $devops_access_token" \
         --request POST \
         "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
-        2>"$stderr_file")
+        2>&1)
     if [[ $? -ne 0 ]]; then
-        print_error "OIDC token refresh failed at $(date):"
-        print_error "$(cat "$stderr_file")"
-        rm -f "$stderr_file"
+        print_error "OIDC token refresh failed at $(date)\n$response"
         exit 1
     fi
-
-    rm -f "$stderr_file"
 
     local new_token=$(echo "$response" | jq -r '.oidcToken')
     if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
         echo "$new_token" > "$token_file"
         print_highlighted_message "OIDC token refreshed at $(date)"
     else
-        print_error "OIDC token refresh failed at $(date): no oidcToken in response"
+        print_error "OIDC token refresh failed at $(date)\nNo token in response"
         exit 1
     fi
 }
