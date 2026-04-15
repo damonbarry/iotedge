@@ -59,7 +59,6 @@ function usage() {
     echo ' -packageType                             Package type to be used [deb, rpm]'
     echo ' -tenantId                                Azure Tenant ID used by test modules to authenticate to the IoT hub'"'"'s control plane.'
     echo ' -clientId                                Azure Client ID used by test modules to authenticate to the IoT hub'"'"'s control plane.'
-    echo ' -clientSecret                            Azure Client Secret used by test modules to authenticate to the IoT hub'"'"'s control plane.'
     exit 1;
 }
 
@@ -149,7 +148,9 @@ TOKEN_REFRESH_PID=''
 
 function refresh_oidc_token_loop() {
     local token_file="$1"
-    local service_connection_id="$2"
+    local oidc_request_uri="$2"
+    local service_connection_id="$3"
+    local devops_access_token="$4"
     local interval_secs=2700  # 45 minutes
 
     print_highlighted_message "OIDC token refresh loop started (interval: ${interval_secs}s, service connection: $service_connection_id)"
@@ -158,9 +159,9 @@ function refresh_oidc_token_loop() {
         sleep "$interval_secs"
 
         local new_token=$(curl -s -X POST \
-            "${SYSTEM_TEAMFOUNDATIONCOLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/distributedtask/hubs/build/plans/${SYSTEM_PLANID}/jobs/${SYSTEM_JOBID}/oidctoken?serviceConnectionId=${service_connection_id}&api-version=7.1-preview.1" \
+            "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
             -H 'Content-Type: application/json' \
-            -H "Authorization: bearer $DEVOPS_ACCESS_TOKEN" | \
+            -H "Authorization: bearer $devops_access_token" | \
             jq -r '.oidcToken' 2>/dev/null)
 
         if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
@@ -174,11 +175,7 @@ function refresh_oidc_token_loop() {
 
 function start_token_refresh() {
     local token_file="$1"
-    if [[ -z "$SERVICE_CONNECTION_ID" ]]; then
-        print_error "OIDC token refresh: SERVICE_CONNECTION_ID is not set. Token will not be refreshed."
-        return
-    fi
-    refresh_oidc_token_loop "$token_file" "$SERVICE_CONNECTION_ID" &
+    refresh_oidc_token_loop "$token_file" "$OIDC_REQUEST_URI" "$SERVICE_CONNECTION_ID" "$DEVOPS_ACCESS_TOKEN" &
     TOKEN_REFRESH_PID=$!
     print_highlighted_message "OIDC token refresh background process started (PID: $TOKEN_REFRESH_PID)"
 }
@@ -210,6 +207,7 @@ function prepare_test_from_artifacts() {
     echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
     echo "$AZURE_CLIENT_SECRET" > "$working_folder/oidc.json"
     start_token_refresh "$working_folder/oidc.json"
+    trap stop_token_refresh EXIT # kill the token refresh background thread when the script exits
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
     cp "$REPO_PATH/e2e_deployment_files/$DEPLOYMENT_FILE_NAME" "$deployment_working_file"
@@ -308,8 +306,6 @@ function prepare_test_from_artifacts() {
 
 function clean_up() {
     print_highlighted_message 'Clean up'
-
-    stop_token_refresh || true
 
     # TODO: Need to fix this script to deploy correct iotedge artifact.
     # Because it deploys iotedge installed from apt, we need to stop 1.0.10 service.
@@ -420,143 +416,143 @@ function process_args() {
         elif [ $saveNextArg -eq 8 ]; then
             EVENTHUB_NAMESPACE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 53 ]; then
+        elif [ $saveNextArg -eq 9 ]; then
             EVENTHUB_NAME="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 9 ]; then
+        elif [ $saveNextArg -eq 10 ]; then
             EVENT_HUB_CONSUMER_GROUP_ID="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 10 ]; then
+        elif [ $saveNextArg -eq 11 ]; then
             TEST_DURATION="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 11 ]; then
+        elif [ $saveNextArg -eq 12 ]; then
             TEST_START_DELAY="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 12 ]; then
+        elif [ $saveNextArg -eq 13 ]; then
             NETWORK_CONTROLLER_FREQUENCIES=($arg)
             saveNextArg=0
-        elif [ $saveNextArg -eq 13 ]; then
+        elif [ $saveNextArg -eq 14 ]; then
             NETWORK_CONTROLLER_RUNPROFILE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 14 ]; then
+        elif [ $saveNextArg -eq 15 ]; then
             LOG_ANALYTICS_WORKSPACEID="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 15 ]; then
+        elif [ $saveNextArg -eq 16 ]; then
             LOG_ANALYTICS_SHAREDKEY="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 16 ]; then
+        elif [ $saveNextArg -eq 17 ]; then
             LOG_ANALYTICS_LOGTYPE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 17 ]; then
+        elif [ $saveNextArg -eq 18 ]; then
             VERIFICATION_DELAY="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 18 ]; then
+        elif [ $saveNextArg -eq 19 ]; then
             UPSTREAM_PROTOCOL="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 19 ]; then
+        elif [ $saveNextArg -eq 20 ]; then
             DEPLOYMENT_TEST_UPDATE_PERIOD="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 20 ]; then
+        elif [ $saveNextArg -eq 21 ]; then
             TIME_FOR_REPORT_GENERATION="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 21 ]; then
+        elif [ $saveNextArg -eq 22 ]; then
             METRICS_ENDPOINTS_CSV="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 22 ]; then
+        elif [ $saveNextArg -eq 23 ]; then
             METRICS_SCRAPE_FREQUENCY_IN_SECS="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 23 ]; then
+        elif [ $saveNextArg -eq 24 ]; then
             METRICS_UPLOAD_TARGET="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 24 ]; then
+        elif [ $saveNextArg -eq 25 ]; then
             BLOB_STORE_SAS="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 25 ]; then
+        elif [ $saveNextArg -eq 26 ]; then
             DEVOPS_ACCESS_TOKEN="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 26 ]; then
+        elif [ $saveNextArg -eq 27 ]; then
             DEVOPS_BUILDID="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 27 ]; then
+        elif [ $saveNextArg -eq 28 ]; then
             DEPLOYMENT_FILE_NAME="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 28 ]; then
+        elif [ $saveNextArg -eq 29 ]; then
             RESTART_TEST_RESTART_PERIOD="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 29 ]; then
+        elif [ $saveNextArg -eq 30 ]; then
             RESTART_TEST_SDK_OPERATION_TIMEOUT="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 30 ]; then
+        elif [ $saveNextArg -eq 31 ]; then
             EDGE_RUNTIME_BUILD_NUMBER="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 31 ]; then
+        elif [ $saveNextArg -eq 32 ]; then
             CUSTOM_EDGE_AGENT_IMAGE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 32 ]; then
+        elif [ $saveNextArg -eq 33 ]; then
             CUSTOM_EDGE_HUB_IMAGE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 33 ]; then
+        elif [ $saveNextArg -eq 34 ]; then
             TEST_RUNTIME_LOG_LEVEL="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 34 ]; then
+        elif [ $saveNextArg -eq 35 ]; then
             TEST_INFO="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 35 ]; then
+        elif [ $saveNextArg -eq 36 ]; then
             TWIN_UPDATE_SIZE="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 36 ]; then
+        elif [ $saveNextArg -eq 37 ]; then
             TEST_NAME="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 37 ]; then
+        elif [ $saveNextArg -eq 38 ]; then
             CONNECT_MANAGEMENT_URI="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 38 ]; then
+        elif [ $saveNextArg -eq 39 ]; then
             CONNECT_WORKLOAD_URI="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 39 ]; then
+        elif [ $saveNextArg -eq 40 ]; then
             LISTEN_MANAGEMENT_URI="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 40 ]; then
+        elif [ $saveNextArg -eq 41 ]; then
             LISTEN_WORKLOAD_URI="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 41 ]; then
+        elif [ $saveNextArg -eq 42 ]; then
             DESIRED_MODULES_TO_RESTART_CSV="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 42 ]; then
+        elif [ $saveNextArg -eq 43 ]; then
             RESTART_INTERVAL_IN_MINS="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 43 ]; then
+        elif [ $saveNextArg -eq 44 ]; then
             SEND_REPORT_FREQUENCY="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 44 ]; then
+        elif [ $saveNextArg -eq 45 ]; then
             TEST_MODE="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 45 ]; then
+        elif [ $saveNextArg -eq 46 ]; then
             REPO_PATH="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 46 ]; then
+        elif [ $saveNextArg -eq 47 ]; then
             CLIENT_MODULE_TRANSPORT_TYPE="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 47 ]; then
+        elif [ $saveNextArg -eq 48 ]; then
             TRACKING_ID="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 48 ]; then
+        elif [ $saveNextArg -eq 49 ]; then
             TOPOLOGY="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 49 ]; then
+        elif [ $saveNextArg -eq 50 ]; then
             PACKAGE_TYPE="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 50 ]; then
+        elif [ $saveNextArg -eq 51 ]; then
             AZURE_TENANT_ID="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 51 ]; then
+        elif [ $saveNextArg -eq 52 ]; then
             AZURE_CLIENT_ID="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 52 ]; then
-            AZURE_CLIENT_SECRET="$arg"
+        elif [ $saveNextArg -eq 53 ]; then
+            SERVICE_CONNECTION_ID="$arg"
             saveNextArg=0
         elif [ $saveNextArg -eq 54 ]; then
-            SERVICE_CONNECTION_ID="$arg"
+            OIDC_REQUEST_URI="$arg"
             saveNextArg=0
         else
             case "$arg" in
@@ -569,54 +565,54 @@ function process_args() {
                 '-containerRegistryPassword' ) saveNextArg=6;;
                 '-iotHubHostName' ) saveNextArg=7;;
                 '-eventHubNamespace' ) saveNextArg=8;;
-                '-eventHubName' ) saveNextArg=53;;
-                '-eventHubConsumerGroupId' ) saveNextArg=9;;
-                '-testDuration' ) saveNextArg=10;;
-                '-testStartDelay' ) saveNextArg=11;;
-                '-networkControllerFrequency' ) saveNextArg=12;;
-                '-networkControllerRunProfile' ) saveNextArg=13;;
-                '-logAnalyticsWorkspaceId' ) saveNextArg=14;;
-                '-logAnalyticsSharedKey' ) saveNextArg=15;;
-                '-logAnalyticsLogType' ) saveNextArg=16;;
-                '-verificationDelay' ) saveNextArg=17;;
-                '-upstreamProtocol' ) saveNextArg=18;;
-                '-deploymentTestUpdatePeriod' ) saveNextArg=19;;
-                '-timeForReportingGeneration' ) saveNextArg=20;;
-                '-metricsEndpointsCSV' ) saveNextArg=21;;
-                '-metricsScrapeFrequencyInSecs' ) saveNextArg=22;;
-                '-metricsUploadTarget' ) saveNextArg=23;;
-                '-blobStorageAccountUriWithSasToken' ) saveNextArg=24;;
-                '-devOpsAccessToken' ) saveNextArg=25;;
-                '-devOpsBuildId' ) saveNextArg=26;;
-                '-deploymentFileName' ) saveNextArg=27;;
-                '-EdgeHubRestartTestRestartPeriod' ) saveNextArg=28;;
-                '-EdgeHubRestartTestSdkOperationTimeout' ) saveNextArg=29;;
-                '-edgeRuntimeBuildNumber' ) saveNextArg=30;;
-                '-customEdgeAgentImage' ) saveNextArg=31;;
-                '-customEdgeHubImage' ) saveNextArg=32;;
-                '-testRuntimeLogLevel' ) saveNextArg=33;;
-                '-testInfo' ) saveNextArg=34;;
-                '-twinUpdateSize' ) saveNextArg=35;;
-                '-testName' ) saveNextArg=36;;
-                '-connectManagementUri' ) saveNextArg=37;;
-                '-connectWorkloadUri' ) saveNextArg=38;;
-                '-listenManagementUri' ) saveNextArg=39;;
-                '-listenWorkloadUri' ) saveNextArg=40;;
-                '-desiredModulesToRestartCSV' ) saveNextArg=41;;
-                '-restartIntervalInMins' ) saveNextArg=42;;
-                '-sendReportFrequency' ) saveNextArg=43;;
-                '-testMode' ) saveNextArg=44;;
-                '-repoPath' ) saveNextArg=45;;
-                '-clientModuleTransportType' ) saveNextArg=46;;
-                '-trackingId' ) saveNextArg=47;;
-                '-topology' ) saveNextArg=48;;
-                '-packageType' ) saveNextArg=49;;
+                '-eventHubName' ) saveNextArg=9;;
+                '-eventHubConsumerGroupId' ) saveNextArg=10;;
+                '-testDuration' ) saveNextArg=11;;
+                '-testStartDelay' ) saveNextArg=12;;
+                '-networkControllerFrequency' ) saveNextArg=13;;
+                '-networkControllerRunProfile' ) saveNextArg=14;;
+                '-logAnalyticsWorkspaceId' ) saveNextArg=15;;
+                '-logAnalyticsSharedKey' ) saveNextArg=16;;
+                '-logAnalyticsLogType' ) saveNextArg=17;;
+                '-verificationDelay' ) saveNextArg=18;;
+                '-upstreamProtocol' ) saveNextArg=19;;
+                '-deploymentTestUpdatePeriod' ) saveNextArg=20;;
+                '-timeForReportingGeneration' ) saveNextArg=21;;
+                '-metricsEndpointsCSV' ) saveNextArg=22;;
+                '-metricsScrapeFrequencyInSecs' ) saveNextArg=23;;
+                '-metricsUploadTarget' ) saveNextArg=24;;
+                '-blobStorageAccountUriWithSasToken' ) saveNextArg=25;;
+                '-devOpsAccessToken' ) saveNextArg=26;;
+                '-devOpsBuildId' ) saveNextArg=27;;
+                '-deploymentFileName' ) saveNextArg=28;;
+                '-EdgeHubRestartTestRestartPeriod' ) saveNextArg=29;;
+                '-EdgeHubRestartTestSdkOperationTimeout' ) saveNextArg=30;;
+                '-edgeRuntimeBuildNumber' ) saveNextArg=31;;
+                '-customEdgeAgentImage' ) saveNextArg=32;;
+                '-customEdgeHubImage' ) saveNextArg=33;;
+                '-testRuntimeLogLevel' ) saveNextArg=34;;
+                '-testInfo' ) saveNextArg=35;;
+                '-twinUpdateSize' ) saveNextArg=36;;
+                '-testName' ) saveNextArg=37;;
+                '-connectManagementUri' ) saveNextArg=38;;
+                '-connectWorkloadUri' ) saveNextArg=39;;
+                '-listenManagementUri' ) saveNextArg=40;;
+                '-listenWorkloadUri' ) saveNextArg=41;;
+                '-desiredModulesToRestartCSV' ) saveNextArg=42;;
+                '-restartIntervalInMins' ) saveNextArg=43;;
+                '-sendReportFrequency' ) saveNextArg=44;;
+                '-testMode' ) saveNextArg=45;;
+                '-repoPath' ) saveNextArg=46;;
+                '-clientModuleTransportType' ) saveNextArg=47;;
+                '-trackingId' ) saveNextArg=48;;
+                '-topology' ) saveNextArg=49;;
+                '-packageType' ) saveNextArg=50;;
                 '-waitForTestComplete' ) WAIT_FOR_TEST_COMPLETE=1;;
                 '-cleanAll' ) CLEAN_ALL=1;;
-                '-tenantId' ) saveNextArg=50;;
-                '-clientId' ) saveNextArg=51;;
-                '-clientSecret' ) saveNextArg=52;;
-                '-serviceConnectionId' ) saveNextArg=54;;
+                '-tenantId' ) saveNextArg=51;;
+                '-clientId' ) saveNextArg=52;;
+                '-serviceConnectionId' ) saveNextArg=53;;
+                '-oidcRequestUri' ) saveNextArg=54;;
 
                 * )
                     echo "Unsupported argument: $saveNextArg $arg"
@@ -649,7 +645,9 @@ function process_args() {
     [[ (-z "${CLIENT_MODULE_TRANSPORT_TYPE,,}") && ("${image_architecture_label,,}" == "arm32v7" || "${image_architecture_label,,}" == "arm64v8") ]] && { print_error 'Arm platform needs to run with client module transport type set'; exit 1; }
     [[ -z "$AZURE_TENANT_ID" ]] && { print_error 'Azure Tenant ID is required'; exit 1; }
     [[ -z "$AZURE_CLIENT_ID" ]] && { print_error 'Azure Client ID is required'; exit 1; }
-    [[ -z "$AZURE_CLIENT_SECRET" ]] && { print_error 'Azure Client Secret is required'; exit 1; }
+    [[ -z "$OIDC_REQUEST_URI" ]] && { print_error 'OIDC request URI is required.'; exit 1; }
+    [[ -z "$SERVICE_CONNECTION_ID" ]] && { print_error 'Service connection ID is required.'; exit 1; }
+    [[ -z "$DEVOPS_ACCESS_TOKEN" ]] && { print_error 'DevOps access token is required.'; exit 1; }
 
     echo 'Required parameters are provided'
 
