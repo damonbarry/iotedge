@@ -144,8 +144,6 @@ function stop_aziot_edge() {
     systemctl stop aziot-keyd aziot-certd aziot-identityd aziot-edged || true
 }
 
-TOKEN_REFRESH_PID=''
-
 function refresh_oidc_token() {
     local token_file="$1"
     local oidc_request_uri="$2"
@@ -181,6 +179,8 @@ function refresh_oidc_token() {
         exit 1
     fi
 }
+
+TOKEN_REFRESH_PID=''
 
 function refresh_oidc_token_loop() {
     local token_file="$1"
