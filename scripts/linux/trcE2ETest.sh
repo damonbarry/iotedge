@@ -146,6 +146,26 @@ function stop_aziot_edge() {
 
 TOKEN_REFRESH_PID=''
 
+function refresh_oidc_token() {
+    local token_file="$1"
+    local oidc_request_uri="$2"
+    local service_connection_id="$3"
+    local devops_access_token="$4"
+
+    local new_token=$(curl -s -X POST \
+        "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
+        -H 'Content-Type: application/json' \
+        -H "Authorization: bearer $devops_access_token" | \
+        jq -r '.oidcToken' 2>/dev/null)
+
+    if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
+        echo "$new_token" > "$token_file"
+        print_highlighted_message "OIDC token refreshed at $(date)"
+    else
+        print_error "OIDC token refresh failed at $(date)"
+    fi
+}
+
 function refresh_oidc_token_loop() {
     local token_file="$1"
     local oidc_request_uri="$2"
@@ -157,19 +177,7 @@ function refresh_oidc_token_loop() {
 
     while true; do
         sleep "$interval_secs"
-
-        local new_token=$(curl -s -X POST \
-            "${oidc_request_uri}?api-version=7.1&serviceConnectionId=${service_connection_id}" \
-            -H 'Content-Type: application/json' \
-            -H "Authorization: bearer $devops_access_token" | \
-            jq -r '.oidcToken' 2>/dev/null)
-
-        if [[ -n "$new_token" && "$new_token" != 'null' ]]; then
-            echo "$new_token" > "$token_file"
-            print_highlighted_message "OIDC token refreshed at $(date)"
-        else
-            print_error "OIDC token refresh failed at $(date)"
-        fi
+        refresh_oidc_token "$token_file" "$oidc_request_uri" "$service_connection_id" "$devops_access_token"
     done
 }
 
@@ -184,6 +192,9 @@ function stop_token_refresh() {
     if [[ -n "$TOKEN_REFRESH_PID" ]]; then
         kill "$TOKEN_REFRESH_PID" 2>/dev/null || true
         TOKEN_REFRESH_PID=''
+        print_highlighted_message "OIDC token refresh background process stopped"
+    else
+        print_highlighted_message "OIDC token refresh background process not found"
     fi
 }
 
@@ -205,9 +216,9 @@ function prepare_test_from_artifacts() {
     mkdir -p "$working_folder"
 
     echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
-    echo "$AZURE_CLIENT_SECRET" > "$working_folder/oidc.json"
+    refresh_oidc_token "$working_folder/oidc.json" "$OIDC_REQUEST_URI" "$SERVICE_CONNECTION_ID" "$DEVOPS_ACCESS_TOKEN"
     start_token_refresh "$working_folder/oidc.json"
-    trap stop_token_refresh EXIT # kill the token refresh background thread when the script exits
+    trap stop_token_refresh EXIT # kill the token refresh background process when the script exits
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
     cp "$REPO_PATH/e2e_deployment_files/$DEPLOYMENT_FILE_NAME" "$deployment_working_file"
