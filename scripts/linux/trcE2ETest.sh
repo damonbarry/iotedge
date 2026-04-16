@@ -41,18 +41,12 @@ function usage() {
     echo ' -testRuntimeLogLevel                     RuntimeLogLevel given to Quickstart, which is given to edgeAgent and edgeHub.'
     echo ' -testInfo                                Contains comma delimiter test information, e.g. build number and id, source branches of build, edgelet and images.'
     echo ' -twinUpdateSize                          Specifies the char count (i.e. size) of each twin update.'
-    echo " -testName                                Name of test to run. Either 'LongHaul' or 'Connectivity'"
     echo ' -connectManagementUri                    Customize connect management socket'
     echo ' -connectWorkloadUri                      Customize connect workload socket'
     echo ' -listenManagementUri                     Customize listen management socket'
     echo ' -listenWorkloadUri                       Customize listen workload socket'
-    echo ' -desiredModulesToRestartCSV              CSV string of module names for long haul specifying what modules to restart. If specified, then "restartIntervalInMins" must be specified as well.'
-    echo ' -restartIntervalInMins                   Value for long haul specifying how often a random module will restart. If specified, then "desiredModulesToRestartCSV" must be specified as well.'
-    echo ' -sendReportFrequency                     Value for long haul specifying how often TRC will send reports to LogAnalytics.'
-    echo " -testMode                                Test mode for TestResultCoordinator to start up with correct settings. Value is either 'LongHaul' or 'Connectivity'."
     echo " -topology                                Configuration telling the TRC which topology tests are running in."
     echo " -repoPath                                Path of the checked-out iotedge repository for getting the deployment file."
-    echo " -clientModuleTransportType               Value for contrained long haul specifying transport type for all client modules."
     echo " -trackingId                              Tracking id used to tag test events. Needed if running nested tests and test events are sent to TRC from L4 node. Otherwise generated."
     echo ' -cleanAll                                Do docker prune for containers, logs and volumes.'
     echo ' -packageType                             Package type to be used [deb, rpm]'
@@ -212,45 +206,16 @@ function prepare_test_from_artifacts() {
     sed -i -e "s@<NetworkController.OnlineFrequency0>@${NETWORK_CONTROLLER_FREQUENCIES[1]}@g" "$deployment_working_file"
     sed -i -e "s@<NetworkController.RunsCount0>@${NETWORK_CONTROLLER_FREQUENCIES[2]}@g" "$deployment_working_file"
 
-    sed -i -e "s@<TestMode>@$TEST_MODE@g" "$deployment_working_file"
     sed -i -e "s@<Topology>@$TOPOLOGY@g" "$deployment_working_file"
 
     sed -i -e "s@<LogRotationMaxFile>@$log_rotation_max_file@g" "$deployment_working_file"
     sed -i -e "s@<LogRotationMaxFileEdgeHub>@$log_rotation_max_file_edgehub@g" "$deployment_working_file"
 
-    if [[ "${TEST_NAME,,}" == "${LONGHAUL_TEST_NAME,,}" ]]; then
-        sed -i -e "s@<DesiredModulesToRestartCSV>@$DESIRED_MODULES_TO_RESTART_CSV@g" "$deployment_working_file"
-        sed -i -e "s@<RestartIntervalInMins>@$RESTART_INTERVAL_IN_MINS@g" "$deployment_working_file"
-        sed -i -e "s@<SendReportFrequency>@$SEND_REPORT_FREQUENCY@g" "$deployment_working_file"
-
-        if [ "$image_architecture_label" = 'arm32v7' ] ||
-            [ "$image_architecture_label" = 'arm64v8' ]; then
-            sed -i -e "s@<EdgeAgentMemoryThreshold>@$EDGE_AGENT_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<EdgeHubMemoryThreshold>@$EDGE_HUB_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<LoadGenMemoryThreshold>@$LOAD_GEN_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<RelayerMemoryThreshold>@$RELAYER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<TwinTesterMemoryThreshold>@$TWIN_TESTER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<DirectMethodSenderMemoryThreshold>@$DIRECT_METHOD_SENDER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<DirectMethodReceiverMemoryThreshold>@$DIRECT_METHOD_RECEIVER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<TrcMemoryThreshold>@$TRC_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<NetworkControllerMemoryThreshold>@$NETWORK_CONTROLLER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<MetricsCollectorMemoryThreshold>@$METRICS_COLLECTOR_MEMORY_THRESHOLD@g" "$deployment_working_file"
-            sed -i -e "s@<ModuleRestarterMemoryThreshold>@$MODULE_RESTARTER_MEMORY_THRESHOLD@g" "$deployment_working_file"
-
-            sed -i -e "s@<EdgeHubMqttEnabled>@$EDGE_HUB_MQTT_ENABLED@g" "$deployment_working_file"
-            sed -i -e "s@<EdgeHubAmqpEnabled>@$EDGE_HUB_AMQP_ENABLED@g" "$deployment_working_file"
-
-            sed -i -e "s@<ClientModuleTransportType>@$CLIENT_MODULE_TRANSPORT_TYPE@g" "$deployment_working_file"
-        fi
-    fi
-
-    if [[ "${TEST_NAME,,}" == "${CONNECTIVITY_TEST_NAME,,}" ]]; then
-        sed -i -e "s@<TestDuration>@$TEST_DURATION@g" "$deployment_working_file"
-        sed -i -e "s@<DeploymentTester1.DeploymentUpdatePeriod>@$DEPLOYMENT_TEST_UPDATE_PERIOD@g" "$deployment_working_file"
-        sed -i -e "s@<EdgeHubRestartTest.RestartPeriod>@$RESTART_TEST_RESTART_PERIOD@g" "$deployment_working_file"
-        sed -i -e "s@<EdgeHubRestartTest.SdkOperationTimeout>@$RESTART_TEST_SDK_OPERATION_TIMEOUT@g" "$deployment_working_file"
-        sed -i -e "s@<TestResultCoordinator.VerificationDelay>@$VERIFICATION_DELAY@g" "$deployment_working_file"
-    fi
+    sed -i -e "s@<TestDuration>@$TEST_DURATION@g" "$deployment_working_file"
+    sed -i -e "s@<DeploymentTester1.DeploymentUpdatePeriod>@$DEPLOYMENT_TEST_UPDATE_PERIOD@g" "$deployment_working_file"
+    sed -i -e "s@<EdgeHubRestartTest.RestartPeriod>@$RESTART_TEST_RESTART_PERIOD@g" "$deployment_working_file"
+    sed -i -e "s@<EdgeHubRestartTest.SdkOperationTimeout>@$RESTART_TEST_SDK_OPERATION_TIMEOUT@g" "$deployment_working_file"
+    sed -i -e "s@<TestResultCoordinator.VerificationDelay>@$VERIFICATION_DELAY@g" "$deployment_working_file"
 }
 
 function clean_up() {
@@ -446,9 +411,6 @@ function process_args() {
         elif [ $saveNextArg -eq 35 ]; then
             TWIN_UPDATE_SIZE="$arg"
             saveNextArg=0;
-        elif [ $saveNextArg -eq 36 ]; then
-            TEST_NAME="$arg"
-            saveNextArg=0
         elif [ $saveNextArg -eq 37 ]; then
             CONNECT_MANAGEMENT_URI="$arg"
             saveNextArg=0
@@ -461,23 +423,8 @@ function process_args() {
         elif [ $saveNextArg -eq 40 ]; then
             LISTEN_WORKLOAD_URI="$arg"
             saveNextArg=0
-        elif [ $saveNextArg -eq 41 ]; then
-            DESIRED_MODULES_TO_RESTART_CSV="$arg"
-            saveNextArg=0
-        elif [ $saveNextArg -eq 42 ]; then
-            RESTART_INTERVAL_IN_MINS="$arg"
-            saveNextArg=0;
-        elif [ $saveNextArg -eq 43 ]; then
-            SEND_REPORT_FREQUENCY="$arg"
-            saveNextArg=0;
-        elif [ $saveNextArg -eq 44 ]; then
-            TEST_MODE="$arg"
-            saveNextArg=0;
         elif [ $saveNextArg -eq 45 ]; then
             REPO_PATH="$arg"
-            saveNextArg=0;
-        elif [ $saveNextArg -eq 46 ]; then
-            CLIENT_MODULE_TRANSPORT_TYPE="$arg"
             saveNextArg=0;
         elif [ $saveNextArg -eq 47 ]; then
             TRACKING_ID="$arg"
@@ -526,17 +473,11 @@ function process_args() {
                 '-testRuntimeLogLevel' ) saveNextArg=33;;
                 '-testInfo' ) saveNextArg=34;;
                 '-twinUpdateSize' ) saveNextArg=35;;
-                '-testName' ) saveNextArg=36;;
                 '-connectManagementUri' ) saveNextArg=37;;
                 '-connectWorkloadUri' ) saveNextArg=38;;
                 '-listenManagementUri' ) saveNextArg=39;;
                 '-listenWorkloadUri' ) saveNextArg=40;;
-                '-desiredModulesToRestartCSV' ) saveNextArg=41;;
-                '-restartIntervalInMins' ) saveNextArg=42;;
-                '-sendReportFrequency' ) saveNextArg=43;;
-                '-testMode' ) saveNextArg=44;;
                 '-repoPath' ) saveNextArg=45;;
-                '-clientModuleTransportType' ) saveNextArg=46;;
                 '-trackingId' ) saveNextArg=47;;
                 '-topology' ) saveNextArg=48;;
                 '-packageType' ) saveNextArg=49;;
@@ -569,8 +510,6 @@ function process_args() {
     [[ -z "$BLOB_STORE_SAS" ]] && { print_error 'Blob Store SAS Uri is required'; exit 1; }
     [[ -z "$TEST_INFO" ]] && { print_error 'Test info is required'; exit 1; }
     [[ -z "$REPO_PATH" ]] && { print_error 'Repo path is required'; exit 1; }
-    [[ (-z "${TEST_NAME,,}") || ("${TEST_NAME,,}" != "${LONGHAUL_TEST_NAME,,}" && "${TEST_NAME,,}" != "${CONNECTIVITY_TEST_NAME,,}") ]] && { print_error 'Invalid test name'; exit 1; }
-    [[ (-z "${CLIENT_MODULE_TRANSPORT_TYPE,,}") && ("${image_architecture_label,,}" == "arm32v7" || "${image_architecture_label,,}" == "arm64v8") ]] && { print_error 'Arm platform needs to run with client module transport type set'; exit 1; }
 
     echo 'Required parameters are provided'
 
@@ -756,150 +695,6 @@ function run_connectivity_test() {
     return $testExitCode
 }
 
-function run_longhaul_test() {
-    print_highlighted_message "Run Long Haul test for $image_architecture_label"
-    test_setup
-
-	NESTED_EDGE_TEST=$(printenv E2E_nestedEdgeTest)
-
-	local hash
-	hash=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 8)
-	local device_id="$RELEASE_LABEL-Linux-$image_architecture_label-longhaul-$hash"
-
-    test_start_time="$(date '+%Y-%m-%d %H:%M:%S')"
-    print_highlighted_message "Run Long Haul test with -d '$device_id' started at $test_start_time"
-
-    SECONDS=0
-
-    local ret=0
-
-    DEVICE_CA_CERT=$(printenv E2E_deviceCaCert)
-    DEVICE_CA_PRIVATE_KEY=$(printenv E2E_deviceCaPrivateKey)
-    TRUSTED_CA_CERTS=$(printenv E2E_trustedCaCerts)
-    echo "Device CA cert=$DEVICE_CA_CERT"
-    echo "Device CA private key=$DEVICE_CA_PRIVATE_KEY"
-    echo "Trusted CA certs=$TRUSTED_CA_CERTS"
-
-    if [[ -z "$BYPASS_EDGE_INSTALLATION" ]]; then
-        BYPASS_EDGE_INSTALLATION=--overwrite-packages
-    fi
-
-    if [[ ! -z "$NESTED_EDGE_TEST" ]]; then
-        HOSTNAME=$(printenv E2E_hostname)
-        PARENT_HOSTNAME=$(printenv E2E_parentHostname)
-        PARENT_EDGE_DEVICE=$(printenv E2E_parentEdgeDevice)
-
-        echo "Running with nested Edge."
-        echo "HostName=$HOSTNAME"
-        echo "ParentHostName=$PARENT_HOSTNAME"
-        echo "ParentEdgeDevice=$PARENT_EDGE_DEVICE"
-
-        "$quickstart_working_folder/IotEdgeQuickstart" \
-            -d "$device_id" \
-            -a "$E2E_TEST_DIR/artifacts/" \
-            -c "$IOT_HUB_CONNECTION_STRING" \
-            -e "$EVENTHUB_CONNECTION_STRING" \
-            -r "$CONTAINER_REGISTRY" \
-            -u "$CONTAINER_REGISTRY_USERNAME" \
-            -p "$CONTAINER_REGISTRY_PASSWORD" \
-            -n "$HOSTNAME" \
-            --parent-hostname "$PARENT_HOSTNAME" \
-            --parent-edge-device "$PARENT_EDGE_DEVICE" \
-            --device_ca_cert "$DEVICE_CA_CERT" \
-            --device_ca_pk "$DEVICE_CA_PRIVATE_KEY" \
-            --trusted_ca_certs "$TRUSTED_CA_CERTS" \
-            -t "$ARTIFACT_IMAGE_BUILD_NUMBER-linux-$image_architecture_label" \
-            --initialize-with-agent-artifact "true" \
-            --leave-running=All \
-            -l "$deployment_working_file" \
-            --runtime-log-level "$TEST_RUNTIME_LOG_LEVEL" \
-            --use-connect-management-uri="$CONNECT_MANAGEMENT_URI" \
-            --use-connect-workload-uri="$CONNECT_WORKLOAD_URI" \
-            --use-listen-management-uri="$LISTEN_MANAGEMENT_URI" \
-            --use-listen-workload-uri="$LISTEN_WORKLOAD_URI" \
-            $BYPASS_EDGE_INSTALLATION \
-            --no-verify && ret=$? || ret=$?
-    else
-        "$quickstart_working_folder/IotEdgeQuickstart" \
-            -d "$device_id" \
-            -a "$E2E_TEST_DIR/artifacts/" \
-            -c "$IOT_HUB_CONNECTION_STRING" \
-            -e "$EVENTHUB_CONNECTION_STRING" \
-            -r "$CONTAINER_REGISTRY" \
-            -u "$CONTAINER_REGISTRY_USERNAME" \
-            -p "$CONTAINER_REGISTRY_PASSWORD" \
-            -n "$(hostname)" \
-            -t "$ARTIFACT_IMAGE_BUILD_NUMBER-linux-$image_architecture_label" \
-            --initialize-with-agent-artifact "true" \
-            --leave-running=All \
-            -l "$deployment_working_file" \
-            --runtime-log-level "$TEST_RUNTIME_LOG_LEVEL" \
-            --use-connect-management-uri="$CONNECT_MANAGEMENT_URI" \
-            --use-connect-workload-uri="$CONNECT_WORKLOAD_URI" \
-            --use-listen-management-uri="$LISTEN_MANAGEMENT_URI" \
-            --use-listen-workload-uri="$LISTEN_WORKLOAD_URI" \
-            --device_ca_cert "$DEVICE_CA_CERT" \
-            --device_ca_pk "$DEVICE_CA_PRIVATE_KEY" \
-            --trusted_ca_certs "$TRUSTED_CA_CERTS" \
-            $PACKAGE_TYPE_ARG \
-            $BYPASS_EDGE_INSTALLATION \
-            --no-verify && ret=$? || ret=$?
-    fi
-
-    local elapsed_seconds=$SECONDS
-    test_end_time="$(date '+%Y-%m-%d %H:%M:%S')"
-
-    if [ $ret -ne 0 ]; then
-        elapsed_time="$(TZ=UTC0 printf '%(%H:%M:%S)T\n' "$elapsed_seconds")"
-        print_highlighted_message "Test completed at $test_end_time, took $elapsed_time."
-
-        print_error "Deploy longhaul test failed."
-
-        print_deployment_logs
-    fi
-
-    return $ret
-}
-
-function configure_longhaul_settings() {
-    DESIRED_MODULES_TO_RESTART_CSV="${DESIRED_MODULES_TO_RESTART_CSV:-,}"
-    RESTART_INTERVAL_IN_MINS="${RESTART_INTERVAL_IN_MINS:-240}"
-    NETWORK_CONTROLLER_RUNPROFILE=${NETWORK_CONTROLLER_RUNPROFILE:-Online}
-
-    if [ "$image_architecture_label" = 'amd64' ]; then
-        log_upload_enabled=true
-        log_rotation_max_file="125"
-        log_rotation_max_file_edgehub="400"
-    fi
-    if [ "$image_architecture_label" = 'arm32v7' ] ||
-        [ "$image_architecture_label" = 'arm64v8' ]; then
-        log_upload_enabled=false
-        log_rotation_max_file="7"
-        log_rotation_max_file_edgehub="30"
-
-        MB_CONSTANT=$((1024 * 1024))
-        EDGE_AGENT_MEMORY_THRESHOLD=$((70 * $MB_CONSTANT))
-        EDGE_HUB_MEMORY_THRESHOLD=$((140 * $MB_CONSTANT))
-        LOAD_GEN_MEMORY_THRESHOLD=$((40 * $MB_CONSTANT))
-        RELAYER_MEMORY_THRESHOLD=$((30 * $MB_CONSTANT))
-        TWIN_TESTER_MEMORY_THRESHOLD=$((70 * $MB_CONSTANT))
-        DIRECT_METHOD_SENDER_MEMORY_THRESHOLD=$((30 * $MB_CONSTANT))
-        DIRECT_METHOD_RECEIVER_MEMORY_THRESHOLD=$((40 * $MB_CONSTANT))
-        TRC_MEMORY_THRESHOLD=$((200 * $MB_CONSTANT))
-        NETWORK_CONTROLLER_MEMORY_THRESHOLD=$((10 * $MB_CONSTANT))
-        METRICS_COLLECTOR_MEMORY_THRESHOLD=$((55 * $MB_CONSTANT))
-        MODULE_RESTARTER_MEMORY_THRESHOLD=$((30 * $MB_CONSTANT))
-
-        if [ "${CLIENT_MODULE_TRANSPORT_TYPE,,}" = 'amqp' ]; then
-            EDGE_HUB_MQTT_ENABLED="false"
-            EDGE_HUB_AMQP_ENABLED="true"
-        else
-            EDGE_HUB_MQTT_ENABLED="true"
-            EDGE_HUB_AMQP_ENABLED="false"
-        fi
-    fi
-}
-
 function configure_connectivity_settings() {
     NETWORK_CONTROLLER_RUNPROFILE=${NETWORK_CONTROLLER_RUNPROFILE:-Offline}
     TEST_DURATION="${TEST_DURATION:-01:00:00}"
@@ -920,9 +715,6 @@ function configure_connectivity_settings() {
 
     log_upload_enabled=false
 }
-
-LONGHAUL_TEST_NAME="LongHaul"
-CONNECTIVITY_TEST_NAME="Connectivity"
 
 is_build_canceled=$(is_cancel_build_requested $DEVOPS_ACCESS_TOKEN $DEVOPS_BUILDID)
 if [ "$is_build_canceled" -eq '1' ]; then
@@ -980,21 +772,15 @@ TEST_INFO="$TEST_INFO,NetworkControllerOnlineFrequency=${NETWORK_CONTROLLER_FREQ
 TEST_INFO="$TEST_INFO,NetworkControllerRunsCount=${NETWORK_CONTROLLER_FREQUENCIES[2]}"
 
 testRet=0
-if [[ "${TEST_NAME,,}" == "${LONGHAUL_TEST_NAME,,}" ]]; then
-    configure_longhaul_settings
+configure_connectivity_settings
 
-    run_longhaul_test && testRet=$? || testRet=$?
-elif [[ "${TEST_NAME,,}" == "${CONNECTIVITY_TEST_NAME,,}" ]]; then
-    configure_connectivity_settings
-
-    is_build_canceled=$(is_cancel_build_requested $DEVOPS_ACCESS_TOKEN $DEVOPS_BUILDID)
-    if [ "$is_build_canceled" -eq '1' ]; then
-        print_highlighted_message "build is canceled."
-        exit 3
-    fi
-
-    run_connectivity_test && testRet=$? || testRet=$?
+is_build_canceled=$(is_cancel_build_requested $DEVOPS_ACCESS_TOKEN $DEVOPS_BUILDID)
+if [ "$is_build_canceled" -eq '1' ]; then
+    print_highlighted_message "build is canceled."
+    exit 3
 fi
+
+run_connectivity_test && testRet=$? || testRet=$?
 
 echo "Test exit with result code $testRet"
 exit $testRet

@@ -14,7 +14,6 @@ namespace TestResultCoordinator
     using Newtonsoft.Json.Linq;
     using TestResultCoordinator.Reports;
     using TestResultCoordinator.Reports.DirectMethod.Connectivity;
-    using TestResultCoordinator.Reports.DirectMethod.LongHaul;
     using TestResultCoordinator.Reports.EdgeHubRestartTest;
     using TestResultCoordinator.Reports.LegacyTwin;
 
@@ -101,9 +100,6 @@ namespace TestResultCoordinator
                             break;
                         case TestReportType.DirectMethodConnectivityReport:
                             reportMetadataList.Add(JsonConvert.DeserializeObject<DirectMethodConnectivityReportMetadata>(((JProperty)metadata).Value.ToString()));
-                            break;
-                        case TestReportType.DirectMethodLongHaulReport:
-                            reportMetadataList.Add(JsonConvert.DeserializeObject<DirectMethodLongHaulReportMetadata>(((JProperty)metadata).Value.ToString()));
                             break;
                         case TestReportType.NetworkControllerReport:
                             reportMetadataList.Add(JsonConvert.DeserializeObject<NetworkControllerReportMetadata>(((JProperty)metadata).Value.ToString()));

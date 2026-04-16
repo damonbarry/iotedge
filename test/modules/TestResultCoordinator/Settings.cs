@@ -50,9 +50,7 @@ namespace TestResultCoordinator
             string networkControllerRunProfileName,
             ushort unmatchedResultsMaxSize,
             string testInfo,
-            TestMode testMode,
             Topology topology,
-            bool mqttBrokerEnabled,
             TimeSpan unmatchedResultTolerance,
             TimeSpan eventHubDelayTolerance)
         {
@@ -80,31 +78,11 @@ namespace TestResultCoordinator
             }
 
             this.ConnectivitySpecificSettings = Option.None<ConnectivitySpecificSettings>();
-            this.LongHaulSpecificSettings = Option.None<LongHaulSpecificSettings>();
-            switch (testMode)
+            this.ConnectivitySpecificSettings = Option.Some(new ConnectivitySpecificSettings()
             {
-                case TestMode.Connectivity:
-                    {
-                        this.ConnectivitySpecificSettings = Option.Some(new ConnectivitySpecificSettings()
-                        {
-                            TestDuration = testDuration,
-                            TestVerificationDelay = verificationDelay
-                        });
-                        break;
-                    }
-
-                case TestMode.LongHaul:
-                    {
-                        this.LongHaulSpecificSettings = Option.Some(new LongHaulSpecificSettings()
-                        {
-                            SendReportFrequency = sendReportFrequency,
-                            UnmatchedResultTolerance = unmatchedResultTolerance,
-                            EventHubDelayTolerance = eventHubDelayTolerance
-                        });
-                        break;
-                    }
-            }
-
+                TestDuration = testDuration,
+                TestVerificationDelay = verificationDelay
+            });
             this.TrackingId = Preconditions.CheckNonWhiteSpace(trackingId, nameof(trackingId));
             this.IoTHubConnectionString = Preconditions.CheckNonWhiteSpace(iotHubConnectionString, nameof(iotHubConnectionString));
             this.DeviceId = Preconditions.CheckNonWhiteSpace(deviceId, nameof(deviceId));
@@ -118,9 +96,7 @@ namespace TestResultCoordinator
 
             this.TestInfo = ModuleUtil.ParseKeyValuePairs(testInfo, Logger, true);
             this.TestInfo.Add("DeviceId", this.DeviceId);
-            this.TestMode = testMode;
             this.Topology = topology;
-            this.MqttBrokerEnabled = mqttBrokerEnabled;
         }
 
         private NetworkControllerType GetNetworkControllerType(string networkControllerRunProfileName)
@@ -168,9 +144,7 @@ namespace TestResultCoordinator
                 configuration.GetValue<string>(TestConstants.NetworkController.RunProfilePropertyName),
                 configuration.GetValue<ushort>("UNMATCHED_RESULTS_MAX_SIZE", DefaultUnmatchedResultsMaxSize),
                 configuration.GetValue<string>("TEST_INFO"),
-                configuration.GetValue("testMode", TestMode.Connectivity),
                 configuration.GetValue("topology", Topology.SingleNode),
-                configuration.GetValue("mqttBrokerEnabled", false),
                 configuration.GetValue("unmatchedResultTolerance", TimeSpan.FromMinutes(1)),
                 configuration.GetValue("eventHubDelayTolerance", TimeSpan.FromHours(1)));
         }
@@ -205,13 +179,7 @@ namespace TestResultCoordinator
 
         public Option<ConnectivitySpecificSettings> ConnectivitySpecificSettings { get; }
 
-        public Option<LongHaulSpecificSettings> LongHaulSpecificSettings { get; }
-
-        public TestMode TestMode { get; }
-
         public Topology Topology { get; }
-
-        public bool MqttBrokerEnabled { get; }
 
         public override string ToString()
         {
@@ -227,18 +195,10 @@ namespace TestResultCoordinator
                 { nameof(this.TestStartDelay), this.TestStartDelay.ToString() },
                 { nameof(this.NetworkControllerType), this.NetworkControllerType.ToString() },
                 { nameof(this.TestInfo), JsonConvert.SerializeObject(this.TestInfo) },
-                { nameof(this.TestMode), this.TestMode.ToString() },
-                { nameof(this.Topology), this.Topology.ToString() },
-                { nameof(this.MqttBrokerEnabled), this.MqttBrokerEnabled.ToString() }
+                { nameof(this.Topology), this.Topology.ToString() }
             };
 
             this.TestResultEventReceivingServiceSettings.ForEach(settings => fields.Add(nameof(settings.ConsumerGroupName), settings.ConsumerGroupName));
-            this.LongHaulSpecificSettings.ForEach(settings =>
-            {
-                fields.Add(nameof(settings.SendReportFrequency), settings.SendReportFrequency.ToString());
-                fields.Add(nameof(settings.UnmatchedResultTolerance), settings.UnmatchedResultTolerance.ToString());
-                fields.Add(nameof(settings.EventHubDelayTolerance), settings.EventHubDelayTolerance.ToString());
-            });
             this.ConnectivitySpecificSettings.ForEach(settings =>
             {
                 fields.Add(nameof(settings.TestDuration), settings.TestDuration.ToString());
@@ -293,12 +253,5 @@ namespace TestResultCoordinator
     {
         public TimeSpan TestDuration;
         public TimeSpan TestVerificationDelay;
-    }
-
-    internal struct LongHaulSpecificSettings
-    {
-        public TimeSpan SendReportFrequency;
-        public TimeSpan UnmatchedResultTolerance;
-        public TimeSpan EventHubDelayTolerance;
     }
 }
