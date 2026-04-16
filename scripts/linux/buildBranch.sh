@@ -229,7 +229,6 @@ publish_app "Microsoft.Azure.Devices.Edge.Azure.Monitor"
 publish_lib "Microsoft.Azure.WebJobs.Extensions.EdgeHub"
 
 publish_app "load-gen"
-publish_app "TestAnalyzer"
 publish_app "DirectMethodSender"
 publish_app "DirectMethodReceiver"
 publish_app "ModuleRestarter"

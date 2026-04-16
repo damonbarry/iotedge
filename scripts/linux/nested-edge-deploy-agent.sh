@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # This script is intended to be used for nested edge tests. It deploys level 4 and level 5.
-# Level 3 is deployed by specialized script for connectivity/long haul and quick start.
+# Level 3 is deployed by specialized script for connectivity and quick start.
 
 function create_certificates() {
     echo "Installing test root certificate bundle."

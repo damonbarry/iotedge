@@ -272,17 +272,6 @@ stages:
           platforms: $(platforms)
           version: $(Build.BuildNumber)
 
-    - job: BuildImageTestAnalyzer
-      steps:
-      - template: image-linux.yaml
-        parameters:
-          displayName: Test Analyzer
-          name: azureiotedge-analyzer
-          app: TestAnalyzer
-          version: $(Build.BuildNumber)
-          use_rocksdb: true
-          platforms: $(platforms)
-
       # Functions Sample - Only supported on amd64
     - job: BuildImageFunctionsSample
       steps:
