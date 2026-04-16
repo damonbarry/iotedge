@@ -14,31 +14,33 @@ function usage() {
     echo ' -artifactImageBuildNumber                Artifact image build number is used to construct path of docker images, pulling from docker registry. E.g. 20190101.1.'
     echo " -containerRegistry                       Host address of container registry."
     echo " -containerRegistryUsername               Username of container registry."
-    echo ' -containerRegistryPassword               Password of given username for container registory.'
+    echo ' -containerRegistryPassword               Password of given username for container registry.'
     echo ' -iotHubHostName                          Hostname of IoT hub where edge device will be created.'
     echo ' -eventHubNamespace                       Fully qualified event hub namespace to receive D2C messages.'
     echo ' -eventHubName                            Event hub name to receive D2C messages.'
     echo ' -eventHubConsumerGroupId                 Event hub consumer group for receive D2C messages.'
     echo ' -testDuration                            Connectivity test duration'
     echo ' -testStartDelay                          Tests start after delay for applicable modules'
-    echo ' -networkControllerFrequency              Frequency for controlling the network with offlineFrequence, onlineFrequence, runsCount. Example "00:05:00 00:05:00 6"'
+    echo ' -networkControllerFrequency              Frequency for controlling the network with offlineFrequency, onlineFrequency, runsCount. Example "00:05:00 00:05:00 6"'
     echo ' -networkControllerRunProfile             Online, Offline, SatelliteGood or Cellular3G'
     echo ' -logAnalyticsWorkspaceId                 Log Analytics Workspace Id'
     echo ' -logAnalyticsSharedKey                   Log Analytics shared key'
     echo ' -logAnalyticsLogType                     Log Analytics log type'
     echo ' -verificationDelay                       Delay before starting the verification after test finished'
     echo ' -upstreamProtocol                        Upstream protocol used to connect to IoT Hub'
-    echo ' -deploymentTestUpdatePeriod              duration of updating deployment of target module in deployment test'
+    echo ' -deploymentTestUpdatePeriod              Duration of updating deployment of target module in deployment test'
     echo ' -timeForReportingGeneration              Time reserved for report generation'
-    echo ' -waitForTestComplete                     Wait for test to complete if this parameter is provided.  Otherwise it will finish once deployment is done.'
+    echo ' -waitForTestComplete                     Wait for test to complete if this parameter is provided. Otherwise it will finish once deployment is done.'
     echo ' -metricsEndpointsCSV                     Csv of exposed endpoints for which to scrape metrics.'
     echo ' -metricsScrapeFrequencyInSecs            Frequency at which the MetricsCollector module will scrape metrics from the exposed metrics endpoints. Default is 300 seconds.'
     echo ' -metricsUploadTarget                     Upload target for metrics. Valid values are AzureLogAnalytics or IoTHub. Default is AzureLogAnalytics.'
     echo ' -deploymentFileName                      Deployment file name'
-    echo ' -EdgeHubRestartTestRestartPeriod         EdgeHub restart period (must be greater than 1 minutes)'
+    echo ' -EdgeHubRestartTestRestartPeriod         EdgeHub restart period (must be greater than 1 minute)'
     echo ' -EdgeHubRestartTestSdkOperationTimeout   SDK retry timeout'
     echo ' -blobStorageAccountUriWithSasToken       Azure storage account blob store SAS Uri.'
     echo ' -edgeRuntimeBuildNumber                  Build number for specifying edge runtime (edgeHub and edgeAgent)'
+    echo ' -customEdgeAgentImage                    Custom edge agent image to use instead of the artifact build image.'
+    echo ' -customEdgeHubImage                      Custom edge hub image to use instead of the artifact build image.'
     echo ' -testRuntimeLogLevel                     RuntimeLogLevel given to Quickstart, which is given to edgeAgent and edgeHub.'
     echo ' -testInfo                                Contains comma delimiter test information, e.g. build number and id, source branches of build, edgelet and images.'
     echo ' -twinUpdateSize                          Specifies the char count (i.e. size) of each twin update.'
@@ -53,12 +55,16 @@ function usage() {
     echo " -testMode                                Test mode for TestResultCoordinator to start up with correct settings. Value is either 'LongHaul' or 'Connectivity'."
     echo " -topology                                Configuration telling the TRC which topology tests are running in."
     echo " -repoPath                                Path of the checked-out iotedge repository for getting the deployment file."
-    echo " -clientModuleTransportType               Value for contrained long haul specifying transport type for all client modules."
+    echo " -clientModuleTransportType               Value for constrained long haul specifying transport type for all client modules."
     echo " -trackingId                              Tracking id used to tag test events. Needed if running nested tests and test events are sent to TRC from L4 node. Otherwise generated."
     echo ' -cleanAll                                Do docker prune for containers, logs and volumes.'
     echo ' -packageType                             Package type to be used [deb, rpm]'
+    echo ' -devOpsAccessToken                       Azure DevOps access token used to check for build cancellation and to refresh the OIDC token.'
+    echo ' -devOpsBuildId                           Azure DevOps build ID used to check for build cancellation.'
     echo ' -tenantId                                Azure Tenant ID used by test modules to authenticate to the IoT hub'"'"'s control plane.'
     echo ' -clientId                                Azure Client ID used by test modules to authenticate to the IoT hub'"'"'s control plane.'
+    echo ' -serviceConnectionId                     Azure DevOps service connection ID used to request OIDC token refreshes.'
+    echo ' -oidcRequestUri                          URI used to request OIDC tokens from Azure DevOps.'
     exit 1;
 }
 
