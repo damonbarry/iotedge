@@ -74,7 +74,7 @@ stages:
           mkdir $(Build.ArtifactStagingDirectory)/core-linux && \
           mv $(Build.BinariesDirectory)/publish/{CACertificates,scripts} $(Build.ArtifactStagingDirectory)/core-linux
           if $INCLUDE_QUICKSTART; then
-            mv $(Build.BinariesDirectory)/publish/{e2e_deployment_files,e2e_test_files,IotEdgeQuickstart*,LeafDevice*} $(Build.ArtifactStagingDirectory)/core-linux
+            mv $(Build.BinariesDirectory)/publish/{e2e_deployment_files,e2e_test_files,IotEdgeQuickstart*} $(Build.ArtifactStagingDirectory)/core-linux
           fi
         displayName: Move/stage test file artifacts
         env:
