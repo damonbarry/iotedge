@@ -187,6 +187,8 @@ function refresh_oidc_token_loop() {
         sleep "$interval_secs"
         refresh_oidc_token "$token_file" "$oidc_request_uri" "$service_connection_id" "$devops_access_token"
     done
+
+    print_highlighted_message "OIDC token refresh loop ending"
 }
 
 function start_token_refresh() {
@@ -198,7 +200,7 @@ function start_token_refresh() {
 
 function stop_token_refresh() {
     if [[ -n "$TOKEN_REFRESH_PID" ]]; then
-        kill "$TOKEN_REFRESH_PID" 2>/dev/null || true
+        kill "$TOKEN_REFRESH_PID" 2>&1 || true
         TOKEN_REFRESH_PID=''
         print_highlighted_message "OIDC token refresh background process stopped"
     else
