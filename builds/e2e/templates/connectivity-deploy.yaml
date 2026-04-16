@@ -96,7 +96,6 @@ steps:
         testInfo="$testInfo,ClientProtocol=All"
 
         sudo --preserve-env ${{ parameters['build.repo.path'] }}/scripts/linux/trcE2ETest.sh \
-          -testName 'Connectivity' \
           -testDir "$(Agent.BuildDirectory)/.." \
           -releaseLabel "${{ parameters['release.label'] }}" \
           -artifactImageBuildNumber "$BuildNumber" \
