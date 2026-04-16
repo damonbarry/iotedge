@@ -839,5 +839,7 @@ fi
 
 run_connectivity_test && testRet=$? || testRet=$?
 
+stop_token_refresh
+
 echo "Test exit with result code $testRet"
 exit $testRet
