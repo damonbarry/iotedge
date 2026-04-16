@@ -234,7 +234,9 @@ function prepare_test_from_artifacts() {
     mkdir -p "$working_folder"
 
     echo "Create federated token file for OIDC authentication to IoT Hub at $working_folder/oidc.json"
+    # Initialize the OIDC token file
     refresh_oidc_token "$working_folder/oidc.json" "$OIDC_REQUEST_URI" "$SERVICE_CONNECTION_ID" "$DEVOPS_ACCESS_TOKEN"
+    # Start the background process to refresh the OIDC token periodically
     start_token_refresh "$working_folder/oidc.json"
 
     echo "Copy deployment artifact $DEPLOYMENT_FILE_NAME to $deployment_working_file"
