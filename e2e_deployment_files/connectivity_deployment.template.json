@@ -892,7 +892,7 @@
             },
             "settings": {
               "image": "<Container_Registry>/microsoft/azureiotedge-network-controller:<Build.BuildNumber>-linux-<Architecture>",
-              "createOptions": "{\"HostConfig\":{\"Privileged\":\"true\",\"NetworkMode\":\"host\",\"Binds\":[\"/var/run/docker.sock:/var/run/docker.sock\"]},\"NetworkingConfig\":{\"EndpointsConfig\":{\"host\":{}}}}"
+              "createOptions": "{\"HostConfig\":{\"Privileged\":\"true\",\"NetworkMode\":\"host\",\"Binds\":[\"/var/run/docker.sock:/var/run/docker.sock\"]},\"NetworkingConfig\":{\"EndpointsConfig\":{\"host\":{}}},\"User\":\"root\"}"
             }
           },
           "metricsCollector": {
