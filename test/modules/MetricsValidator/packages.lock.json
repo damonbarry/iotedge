@@ -4,17 +4,18 @@
     "net8.0": {
       "Microsoft.Azure.Devices.Client": {
         "type": "Direct",
-        "requested": "[1.36.10, )",
-        "resolved": "1.36.10",
-        "contentHash": "jzvpHqH/FgyAPvDgQVrpgFhqzbo9FA5k5nqfRRZ6ghTGUsEmtjUGCbzvq9m2tm970G8HBOv7vwqgC7X678JXiw==",
+        "requested": "[1.42.3, )",
+        "resolved": "1.42.3",
+        "contentHash": "U0u26o1Bc/h+Qq3AHek82BfUabkPie3eWtCqHFxDT9y0TIm/ZkdX2nNRYqkdfjexQEewUJXetfDRXKxR9gXY4g==",
         "dependencies": {
           "Azure.Storage.Blobs": "12.19.1",
           "DotNetty.Codecs.Mqtt": "0.7.6",
+          "DotNetty.Common": "0.7.6",
           "DotNetty.Handlers": "0.7.6",
           "Microsoft.Azure.Amqp": "2.5.12",
-          "Microsoft.Azure.Devices.Shared": "1.27.2",
+          "Microsoft.Azure.Devices.Shared": "1.30.4",
           "Microsoft.Win32.Registry": "4.5.0",
-          "Newtonsoft.Json": "12.0.3",
+          "Newtonsoft.Json": "13.0.3",
           "System.Configuration.ConfigurationManager": "4.4.1"
         }
       },
@@ -2107,7 +2108,7 @@
       "microsoft.azure.devices.edge.moduleutil": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Azure.Devices.Client": "[1.36.10, )",
+          "Microsoft.Azure.Devices.Client": "[1.42.3, )",
           "Microsoft.Azure.Devices.Edge.Util": "[1.0.0, )"
         }
       },
@@ -2123,7 +2124,7 @@
         "dependencies": {
           "Azure.Identity": "[1.17.1, )",
           "Microsoft.Azure.Devices": "[1.41.0, )",
-          "Microsoft.Azure.Devices.Client": "[1.36.10, )",
+          "Microsoft.Azure.Devices.Client": "[1.42.3, )",
           "Microsoft.Azure.Devices.Edge.Util": "[1.0.0, )",
           "Microsoft.Azure.EventHubs": "[4.3.2, )",
           "Microsoft.Extensions.Configuration.Binder": "[5.0.0, )",
