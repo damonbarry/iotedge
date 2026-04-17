@@ -323,6 +323,9 @@ stages:
         parameters:
           containerRegistryServer: '$(containerRegistryServer)'
           containerRegistryUsername: '$(containerRegistryUsername)'
+          eventHubName: '$(eventhub.name)'
+          eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+          iotHubHostName: '$(iothub.hostname)'
           iotHubResourceId: '$(iotHubResourceId)'
           rootCaCertificate: '$(rootCaCertificate)'
           rootCaKey: '$(rootCaKey)'
@@ -330,8 +333,6 @@ stages:
         parameters:
           containerRegistryPassword: '$(containerRegistryPassword)'
           dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-          eventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
-          iotHubConnectionString: '$(IotHub-ConnStr)'
           rootCaPassword: '$(rootCaPassword)'
           sas_uri: '$(sas_uri)'
           test_type: $(test_type)

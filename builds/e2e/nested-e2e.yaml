@@ -77,7 +77,6 @@ stages:
       identityArtifactName: aziot-identity-ubuntu24.04-amd64
       artifactName: iotedged-ubuntu24.04-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -102,6 +101,9 @@ stages:
         parameters:
           containerRegistryServer: $(containerRegistryServer)
           containerRegistryUsername: $(containerRegistryUsername)
+          eventHubName: '$(eventhub.name)'
+          eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+          iotHubHostName: '$(iothub.hostname)'
           iotHubResourceId: '$(iotHubResourceId)'
           rootCaCertificate: '$(rootCaCertificate)'
           rootCaKey: '$(rootCaKey)'
@@ -110,8 +112,6 @@ stages:
         parameters:
           containerRegistryPassword: '$(containerRegistryPassword)'
           dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-          eventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
-          iotHubConnectionString: '$(IotHub-ConnStr)'
           rootCaPassword: '$(rootCaPassword)'
           sas_uri: $(sas_uri)
           test_type: nestededge_mqtt
@@ -139,8 +139,6 @@ stages:
         parameters:
           containerRegistryPassword: '$(containerRegistryPassword)'
           dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-          eventHubCompatibleEndpoint: '$(IotHub-EventHubConnStr)'
-          iotHubConnectionString: '$(IotHub-ConnStr)'
           rootCaPassword: '$(rootCaPassword)'
           sas_uri: $(sas_uri)
           test_type: nestededge_amqp

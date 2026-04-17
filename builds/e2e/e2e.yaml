@@ -63,9 +63,6 @@ jobs:
       identityArtifactName: aziot-identity-debian11-arm32v7
       artifactName: iotedged-debian11-arm32v7
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -81,6 +78,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -89,8 +89,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -114,9 +112,6 @@ jobs:
       identityArtifactName: aziot-identity-debian12-amd64
       artifactName: iotedged-debian12-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -132,6 +127,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -139,8 +137,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -164,9 +160,6 @@ jobs:
       identityArtifactName: aziot-identity-debian12-aarch64
       artifactName: iotedged-debian12-aarch64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -180,6 +173,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -187,8 +183,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -211,9 +205,6 @@ jobs:
       identityArtifactName: aziot-identity-debian12-arm32v7
       artifactName: iotedged-debian12-arm32v7
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -230,6 +221,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -238,8 +232,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -263,9 +255,6 @@ jobs:
       identityArtifactName: aziot-identity-ubuntu22.04-amd64
       artifactName: iotedged-ubuntu22.04-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -281,6 +270,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -288,8 +280,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -313,9 +303,6 @@ jobs:
       identityArtifactName: aziot-identity-ubuntu22.04-aarch64
       artifactName: iotedged-ubuntu22.04-aarch64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -331,6 +318,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -338,8 +328,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -363,9 +351,6 @@ jobs:
       identityArtifactName: aziot-identity-ubuntu24.04-amd64
       artifactName: iotedged-ubuntu24.04-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -381,6 +366,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -388,8 +376,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -413,9 +399,6 @@ jobs:
       identityArtifactName: aziot-identity-ubuntu24.04-aarch64
       artifactName: iotedged-ubuntu24.04-aarch64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -429,6 +412,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -436,8 +422,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -453,9 +437,6 @@ jobs:
     variables:
       os: linux
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -492,6 +473,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -499,8 +483,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -524,9 +506,6 @@ jobs:
       identityArtifactName: aziot-identity-redhat8-amd64
       artifactName: iotedged-redhat8-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -540,6 +519,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -547,8 +529,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -572,9 +552,6 @@ jobs:
       identityArtifactName: aziot-identity-redhat9-amd64
       artifactName: iotedged-redhat9-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -588,6 +565,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -595,8 +575,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -619,9 +597,6 @@ jobs:
       identityArtifactName: aziot-identity-ubuntu24.04-amd64
       artifactName: iotedged-ubuntu24.04-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -643,6 +618,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -651,8 +629,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
         test_type: http_proxy
@@ -676,9 +652,6 @@ jobs:
       identityArtifactName: aziot-identity-azurelinux3-amd64
       artifactName: iotedged-azurelinux3-amd64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -694,6 +667,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -701,8 +677,6 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'
 
@@ -724,9 +698,6 @@ jobs:
       identityArtifactName: aziot-identity-azurelinux3-aarch64
       artifactName: iotedged-azurelinux3-aarch64
       dpsGroupKeySymmetric: $[ dependencies.Token.outputs['secrets.dpsGroupKeySymmetric'] ]
-      eventHubCompatibleEndpoint: $[ dependencies.Token.outputs['secrets.eventHubCompatibleEndpoint'] ]
-      iotHubConnectionString: $[ dependencies.Token.outputs['secrets.iotHubConnectionString'] ]
-      iotHubResourceId: $[ dependencies.Token.outputs['secrets.iotHubResourceId'] ]
       rootCaCertificate: $[ dependencies.Token.outputs['secrets.rootCaCertificate'] ]
       rootCaKey: $[ dependencies.Token.outputs['secrets.rootCaKey'] ]
       rootCaPassword: $[ dependencies.Token.outputs['secrets.rootCaPassword'] ]
@@ -742,6 +713,9 @@ jobs:
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
         containerRegistryUsername: '$(containerRegistryUsername)'
+        eventHubName: '$(eventhub.name)'
+        eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+        iotHubHostName: '$(iothub.hostname)'
         iotHubResourceId: '$(iotHubResourceId)'
         rootCaCertificate: '$(rootCaCertificate)'
         rootCaKey: '$(rootCaKey)'
@@ -749,7 +723,5 @@ jobs:
       parameters:
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-        eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-        iotHubConnectionString: '$(iotHubConnectionString)'
         rootCaPassword: '$(rootCaPassword)'
         sas_uri: '$(sas_uri)'

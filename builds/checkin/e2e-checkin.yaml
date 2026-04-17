@@ -73,6 +73,9 @@ stages:
           parameters:
             containerRegistryServer: '$(acrServer)'
             containerRegistryUsername: '$(acrUsername)'
+            eventHubName: '$(eventhub.name)'
+            eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
+            iotHubHostName: '$(iothub.hostname)'
             iotHubResourceId: '$(iotHubResourceId)'
             rootCaCertificate: '$(rootCaCertificate)'
             rootCaKey: '$(rootCaKey)'
@@ -80,7 +83,5 @@ stages:
           parameters:
             containerRegistryPassword: '$(acrPassword)'
             dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
-            eventHubCompatibleEndpoint: '$(eventHubCompatibleEndpoint)'
-            iotHubConnectionString: '$(iotHubConnectionString)'
             rootCaPassword: '$(rootCaPassword)'
             sas_uri: '$(sas_uri)'

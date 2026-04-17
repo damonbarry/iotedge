@@ -80,8 +80,8 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
                 $"e2e-{string.Concat(Dns.GetHostName().Take(14)).TrimEnd(new[] { '-' })}-{DateTime.Now:yyMMdd'-'HHmmss'.'fff}";
 
             this.CaCertScriptPath = Option.Maybe(Get("caCertScriptPath"));
-            this.IotHubHostname = Get("IOT_HUB_HOSTNAME");
-            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.IotHubHostname), $"IOT_HUB_HOSTNAME is missing from environment or context.json.");
+            this.IotHubHostname = Get("iotHubHostName");
+            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.IotHubHostname), $"iotHubHostName is missing from environment or context.json.");
             this.ParentDeviceId = Option.Maybe(Get("parentDeviceId"));
             this.DpsIdScope = Option.Maybe(Get("dpsIdScope"));
             this.DpsGroupKey = Option.Maybe(Get("DPS_GROUP_KEY"));
@@ -89,8 +89,8 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
             this.EdgeHubImage = Option.Maybe(Get("edgeHubImage"));
             this.EdgeHubSchemaVersion = Option.Maybe(Get("edgeHubSchemaVersion"));
             this.DiagnosticsImage = Option.Maybe(Get("diagnosticsImage"));
-            this.EventHubEndpoint = Get("EVENT_HUB_ENDPOINT");
-            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubEndpoint), $"EVENT_HUB_ENDPOINT is missing from environment or context.json.");
+            this.EventHubEndpoint = Get("eventHubEndpoint");
+            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubEndpoint), $"eventHubEndpoint is missing from environment or context.json.");
             this.LogFile = Option.Maybe(Get("logFile"));
             this.MethodReceiverImage = Option.Maybe(Get("methodReceiverImage"));
             this.MethodSenderImage = Option.Maybe(Get("methodSenderImage"));
