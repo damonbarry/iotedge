@@ -327,7 +327,7 @@ stages:
           eventHubName: '$(eventhub.name)'
           eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
           iotHubHostName: '$(iothub.hostname)'
-          iotHubResourceId: '$(iotHubResourceId)'
+          iotHubResourceId: '$(iothub.resourceid)'
           rootCaCertificate: '$(rootCaCertificate)'
           rootCaKey: '$(rootCaKey)'
       - template: templates/e2e-run.yaml
