@@ -62,6 +62,8 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
                            ("trackingId", trackingId),
                            ("useTestResultReportingService", "false"),
                            ("useResultEventReceivingService", "false"),
+                           ("eventHubName", Context.Current.EventHubName),
+                           ("eventHubNamespace", Context.Current.EventHubNamespace),
                            ("IOT_HUB_HOSTNAME", Context.Current.IotHubHostname),
                            ("testStartDelay", "00:00:00"),
                            ("verificationDelay", "00:00:00"),
