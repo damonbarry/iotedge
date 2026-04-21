@@ -99,8 +99,9 @@ stages:
       - template: templates/nested-get-device-name.yaml
       - template: templates/e2e-setup.yaml
         parameters:
-          containerRegistryServer: $(containerRegistryServer)
-          containerRegistryUsername: $(containerRegistryUsername)
+          containerRegistryServer: '$(containerRegistryServer)'
+          containerRegistryUsername: '$(containerRegistryUsername)'
+          dpsIdScope: '$(dps.idScope)'
           eventHubName: '$(eventhub.name)'
           eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
           iotHubHostName: '$(iothub.hostname)'

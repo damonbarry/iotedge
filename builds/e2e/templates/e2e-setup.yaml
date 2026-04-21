@@ -1,6 +1,7 @@
 parameters:
   containerRegistryServer: ''
   containerRegistryUsername: ''
+  dpsIdScope: ''
   eventHubName: ''
   eventHubFullyQualitifiedNamespace: ''
   iotHubHostName: ''
@@ -170,7 +171,7 @@ steps:
         eventHubFullyQualitifiedNamespace = '$(eventHubFullyQualitifiedNamespace)';
         iotHubHostName = '$(iotHubHostName)';
         nestededge = "$nestededge";
-        dpsIdScope = '$(dps.idScope)';
+        dpsIdScope = '${{ parameters.dpsIdScope }}';
         isa95Tag = 'false';
         edgeAgentImage = "$edgeAgentImage";
         edgeHubImage = "$edgeHubImage";

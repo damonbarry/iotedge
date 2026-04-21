@@ -323,6 +323,7 @@ stages:
         parameters:
           containerRegistryServer: '$(containerRegistryServer)'
           containerRegistryUsername: '$(containerRegistryUsername)'
+          dpsIdScope: '$(dps.idScope)'
           eventHubName: '$(eventhub.name)'
           eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
           iotHubHostName: '$(iothub.hostname)'

@@ -73,6 +73,7 @@ stages:
           parameters:
             containerRegistryServer: '$(acrServer)'
             containerRegistryUsername: '$(acrUsername)'
+            dpsIdScope: '$(dps.idScope)'
             eventHubName: '$(eventhub.name)'
             eventHubFullyQualitifiedNamespace: '$(eventhub.namespace.fqdn)'
             iotHubHostName: '$(iothub.hostname)'
