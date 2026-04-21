@@ -167,9 +167,9 @@ steps:
       echo "Edge hub image: $edgeHubImage"
   
       $context = @{
-        eventHubName = '$(eventHubName)';
-        eventHubFullyQualitifiedNamespace = '$(eventHubFullyQualitifiedNamespace)';
-        iotHubHostName = '$(iotHubHostName)';
+        eventHubName = '${{ parameters.eventHubName }}';
+        eventHubFullyQualitifiedNamespace = '${{ parameters.eventHubFullyQualitifiedNamespace }}';
+        iotHubHostName = '${{ parameters.iotHubHostName }}';
         nestededge = "$nestededge";
         dpsIdScope = '${{ parameters.dpsIdScope }}';
         isa95Tag = 'false';
