@@ -22,7 +22,8 @@ namespace Microsoft.Azure.Devices.Edge.Test
         {
             this.iotHub = new IotHub(
                 Context.Current.IotHubHostname,
-                Context.Current.EventHubEndpoint,
+                Context.Current.EventHubName,
+                Context.Current.EventHubNamespace,
                 Context.Current.TestRunnerProxy);
         }
 

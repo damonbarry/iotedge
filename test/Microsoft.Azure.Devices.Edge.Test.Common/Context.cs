@@ -89,8 +89,10 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
             this.EdgeHubImage = Option.Maybe(Get("edgeHubImage"));
             this.EdgeHubSchemaVersion = Option.Maybe(Get("edgeHubSchemaVersion"));
             this.DiagnosticsImage = Option.Maybe(Get("diagnosticsImage"));
-            this.EventHubEndpoint = Get("eventHubEndpoint");
-            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubEndpoint), $"eventHubEndpoint is missing from environment or context.json.");
+            this.EventHubName = Get("eventHubName");
+            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubName), $"eventHubName is missing from environment or context.json.");
+            this.EventHubNamespace = Get("eventHubFullyQualitifiedNamespace");
+            Preconditions.CheckArgument(!string.IsNullOrWhiteSpace(this.EventHubNamespace), $"eventHubFullyQualitifiedNamespace is missing from environment or context.json.");
             this.LogFile = Option.Maybe(Get("logFile"));
             this.MethodReceiverImage = Option.Maybe(Get("methodReceiverImage"));
             this.MethodSenderImage = Option.Maybe(Get("methodSenderImage"));
@@ -148,7 +150,9 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
 
         public Option<string> DiagnosticsImage { get; }
 
-        public string EventHubEndpoint { get; }
+        public string EventHubName { get; }
+
+        public string EventHubNamespace { get; }
 
         public Option<string> LogFile { get; }
 

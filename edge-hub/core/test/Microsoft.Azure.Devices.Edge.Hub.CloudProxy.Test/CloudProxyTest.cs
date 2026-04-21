@@ -7,6 +7,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy.Test
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+    using global::Azure.Messaging.EventHubs;
     using Microsoft.Azure.Devices.Client;
     using Microsoft.Azure.Devices.Client.Exceptions;
     using Microsoft.Azure.Devices.Edge.Hub.Core;
@@ -16,7 +17,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy.Test
     using Microsoft.Azure.Devices.Edge.Util.Test;
     using Microsoft.Azure.Devices.Edge.Util.Test.Common;
     using Microsoft.Azure.Devices.Shared;
-    using Microsoft.Azure.EventHubs;
     using Microsoft.Extensions.Logging;
     using Moq;
     using Newtonsoft.Json.Linq;
@@ -279,8 +279,11 @@ namespace Microsoft.Azure.Devices.Edge.Hub.CloudProxy.Test
 
         static async Task CheckMessageInEventHub(Dictionary<string, IList<IMessage>> sentMessagesByDevice, DateTime startTime)
         {
-            string eventHubConnectionString = await SecretsHelper.GetSecretFromConfigKey("eventHubConnStrKey");
-            var eventHubReceiver = new EventHubReceiver(eventHubConnectionString);
+            // TODO: The following secrets don't actually exist (and when they do, they won't be secrets). This is just
+            // to get the tests building. We need to refactor the tests to not rely on secrets for these values.
+            string eventHubNamespace = await SecretsHelper.GetSecretFromConfigKey("eventHubNamespace");
+            string eventHubName = await SecretsHelper.GetSecretFromConfigKey("eventHubName");
+            var eventHubReceiver = new EventHubReceiver(eventHubNamespace, eventHubName);
             var receivedMessagesByPartition = new Dictionary<string, List<EventData>>();
 
             bool messagesFound = false;
