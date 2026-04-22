@@ -18,14 +18,14 @@ steps:
 #   Amd64Only: Only applies to amd64 architecture
 - task: AzureCLI@2
   displayName: Run tests ${{ parameters.test_type }}
+  env:
+    E2E_DPS_GROUP_KEY: ${{ parameters.dpsGroupKeySymmetric }}
+    E2E_REGISTRIES__0__PASSWORD: ${{ parameters.containerRegistryPassword }}
+    E2E_ROOT_CA_PASSWORD: ${{ parameters.rootCaPassword }}
+    E2E_BLOB_STORE_SAS: ${{ parameters.sas_uri }}
+    no_proxy: 'localhost'
   inputs:
     azureSubscription: ${{ parameters.azureSubscription }}
-    env:
-      E2E_DPS_GROUP_KEY: ${{ parameters.dpsGroupKeySymmetric }}
-      E2E_REGISTRIES__0__PASSWORD: ${{ parameters.containerRegistryPassword }}
-      E2E_ROOT_CA_PASSWORD: ${{ parameters.rootCaPassword }}
-      E2E_BLOB_STORE_SAS: ${{ parameters.sas_uri }}
-      no_proxy: 'localhost'
     scriptType: 'pscore'
     scriptLocation: 'inlineScript'
     inlineScript: |
