@@ -332,6 +332,7 @@ stages:
           rootCaKey: '$(rootCaKey)'
       - template: templates/e2e-run.yaml
         parameters:
+          azureSubscription: '$(az.subscription)'
           containerRegistryPassword: '$(containerRegistryPassword)'
           dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
           rootCaPassword: '$(rootCaPassword)'

@@ -88,6 +88,7 @@ jobs:
     - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -137,6 +138,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -184,6 +186,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -234,6 +237,7 @@ jobs:
     - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -283,6 +287,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -332,6 +337,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -381,6 +387,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -428,6 +435,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -490,6 +498,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -537,6 +546,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -584,6 +594,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -639,6 +650,7 @@ jobs:
     - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -688,6 +700,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
@@ -735,6 +748,7 @@ jobs:
         rootCaKey: '$(rootCaKey)'
     - template: templates/e2e-run.yaml
       parameters:
+        azureSubscription: '$(az.subscription)'
         containerRegistryPassword: '$(containerRegistryPassword)'
         dpsGroupKeySymmetric: '$(dpsGroupKeySymmetric)'
         rootCaPassword: '$(rootCaPassword)'
