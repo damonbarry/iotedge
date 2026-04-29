@@ -735,6 +735,26 @@ jobs:
     timeoutInMinutes: 90
 
     steps:
+    - bash: |
+        hostname=$(hostname)
+        echo "Hostname is: $hostname"
+        echo '============================================================'
+        echo "Ensure $hostname is listed in name service's hosts database:"
+        echo "+ getent hosts $hostname"
+        getent hosts $hostname
+        echo '============================================================'
+        echo "Ensure $hostname is listening on port 5671 (AMQP):"
+        echo "+ ss -tlnp | grep 5671"
+        ss -tlnp | grep 5671
+        echo '============================================================'
+        echo "Ensure Docker user-land proxy is enabled:"
+        echo "+ docker info | grep 'User Namespace'"
+        docker info | grep 'User Namespace'
+        echo '============================================================'
+        echo "Ensure that we can connect to $hostname:443"
+        echo "+ curl -v https://$hostname:443"
+        curl -v https://$hostname:443
+      displayName: Dump info to investigate TCP connection problems
     - template: templates/e2e-setup.yaml
       parameters:
         containerRegistryServer: '$(containerRegistryServer)'
