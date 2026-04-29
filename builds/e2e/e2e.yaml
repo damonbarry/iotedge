@@ -747,6 +747,14 @@ jobs:
         echo "+ ss -tlnp | grep 5671"
         ss -tlnp | grep 5671
         echo '============================================================'
+        echo "Ensure Docker service is running:"
+        echo "+ sudo systemctl enable --now docker"
+        sudo systemctl enable --now docker
+        echo "+ sudo systemctl start docker"
+        sudo systemctl start docker
+        echo "+ sudo systemctl status docker"
+        sudo systemctl status docker
+        echo '============================================================'
         echo "Ensure Docker user-land proxy is enabled:"
         echo "+ docker info | grep 'User Namespace'"
         docker info | grep 'User Namespace'
