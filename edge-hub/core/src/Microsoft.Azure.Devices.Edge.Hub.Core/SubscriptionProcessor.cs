@@ -12,6 +12,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
     using Microsoft.Azure.Devices.Edge.Hub.Core.Device;
     using Microsoft.Azure.Devices.Edge.Hub.Core.Identity;
     using Microsoft.Azure.Devices.Edge.Util;
+    using Microsoft.Azure.Devices.Edge.Util.Concurrency;
     using Microsoft.Azure.Devices.Edge.Util.Metrics;
     using Microsoft.Azure.Devices.Edge.Util.TransientFaultHandling;
     using Microsoft.Extensions.Logging;
@@ -35,7 +36,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
             new ExponentialBackoff(2, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(4));
 
         readonly ConcurrentDictionary<string, ConcurrentQueue<(DeviceSubscription, bool)>> pendingSubscriptions;
-        readonly ConcurrentDictionary<string, bool> subscriptionsBeingProcessed = new ConcurrentDictionary<string, bool>();
+        readonly ConcurrentDictionary<string, AsyncLock> subscriptionLocks = new ConcurrentDictionary<string, AsyncLock>();
         readonly ActionBlock<string> processSubscriptionsBlock;
         readonly IInvokeMethodHandler invokeMethodHandler;
 
@@ -61,13 +62,31 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
             return transientRetryPolicy.ExecuteAsync(func);
         }
 
-        async Task ProcessSubscriptionWithRetry(string id, Option<ICloudProxy> cloudProxy, DeviceSubscription deviceSubscription, bool addSubscription)
+        async Task ProcessSubscriptionWithRetry(string id, DeviceSubscription deviceSubscription, bool addSubscription)
         {
             Events.ProcessingSubscription(id, deviceSubscription);
             try
             {
                 await ExecuteWithRetry(
-                    () => this.ProcessSubscription(id, cloudProxy, deviceSubscription, addSubscription),
+                    async () =>
+                    {
+                        Option<ICloudProxy> cloudProxy = await this.ConnectionManager.GetCloudConnection(id);
+                        if (!cloudProxy.HasValue)
+                        {
+                            Events.ProcessingSubscriptionsNoCloudProxy(id);
+                        }
+
+                        // Preserve local method dispatch while offline, but retry missing upstream subscriptions.
+                        await this.ProcessSubscription(id, cloudProxy, deviceSubscription, addSubscription);
+                        if (!cloudProxy.HasValue
+                            && (deviceSubscription == DeviceSubscription.C2D
+                                || deviceSubscription == DeviceSubscription.DesiredPropertyUpdates
+                                || deviceSubscription == DeviceSubscription.Methods
+                                || (deviceSubscription == DeviceSubscription.TwinResponse && !addSubscription)))
+                        {
+                            throw new EdgeHubConnectionException($"No cloud proxy available to process subscription {deviceSubscription} for client {id}.");
+                        }
+                    },
                     r =>
                         {
                             Metrics.AddRetryOperation(id, addSubscription ? "AddSubscription" : "RemoveSubscription");
@@ -185,32 +204,18 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
 
         async Task ProcessExistingSubscriptions(string id)
         {
-            // Set a flag for an identity that temporarily disables subscription processing for other threads while we process
-            // the identity's subscriptions, so we don't trigger processing subscriptions multiple times for the same identity concurrently.
-            if (!this.subscriptionsBeingProcessed.TryAdd(id, true))
+            // Wait rather than discard a recovery event arriving during an earlier, possibly offline attempt.
+            using (await this.subscriptionLocks.GetOrAdd(id, _ => new AsyncLock()).LockAsync())
             {
-                // Identity subscription already being processed. Skip it.
-                Events.SkippingProcessingSubscription(id);
-            }
-            else
-            {
-                try
-                {
-                    Option<ICloudProxy> cloudProxy = await this.ConnectionManager.GetCloudConnection(id);
-                    Option<IReadOnlyDictionary<DeviceSubscription, bool>> subscriptions = this.ConnectionManager.GetSubscriptions(id);
-                    await subscriptions.ForEachAsync(
-                        async s =>
+                Option<IReadOnlyDictionary<DeviceSubscription, bool>> subscriptions = this.ConnectionManager.GetSubscriptions(id);
+                await subscriptions.ForEachAsync(
+                    async s =>
+                    {
+                        foreach (KeyValuePair<DeviceSubscription, bool> subscription in s)
                         {
-                            foreach (KeyValuePair<DeviceSubscription, bool> subscription in s)
-                            {
-                                await this.ProcessSubscriptionWithRetry(id, cloudProxy, subscription.Key, subscription.Value);
-                            }
-                        });
-                }
-                finally
-                {
-                    this.subscriptionsBeingProcessed.TryRemove(id, out _);
-                }
+                            await this.ProcessSubscriptionWithRetry(id, subscription.Key, subscription.Value);
+                        }
+                    });
             }
         }
 
@@ -218,17 +223,11 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
         {
             Events.ProcessingSubscriptions(id);
             ConcurrentQueue<(DeviceSubscription, bool)> clientSubscriptionsQueue = this.GetClientSubscriptionsQueue(id);
-            if (!clientSubscriptionsQueue.IsEmpty)
+            using (await this.subscriptionLocks.GetOrAdd(id, _ => new AsyncLock()).LockAsync())
             {
-                Option<ICloudProxy> cloudProxy = await this.ConnectionManager.GetCloudConnection(id);
-                if (!cloudProxy.HasValue)
-                {
-                    Events.ProcessingSubscriptionsNoCloudProxy(id);
-                }
-
                 while (clientSubscriptionsQueue.TryDequeue(out (DeviceSubscription deviceSubscription, bool addSubscription) result))
                 {
-                    await this.ProcessSubscriptionWithRetry(id, cloudProxy, result.deviceSubscription, result.addSubscription);
+                    await this.ProcessSubscriptionWithRetry(id, result.deviceSubscription, result.addSubscription);
                 }
             }
         }
@@ -268,8 +267,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                 ProcessingSubscription,
                 DeviceConnectedToEdgeHubProcessingSubscription,
                 ClientConnectedProcessingSubscriptions,
-                ProcessingSubscriptionsNoCloudProxy,
-                SkippingProcessingSubscription
+                ProcessingSubscriptionsNoCloudProxy
             }
 
             public static void ErrorProcessingSubscriptions(Exception ex, IIdentity identity)
@@ -342,11 +340,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                 Log.LogInformation((int)EventIds.DeviceConnectedToEdgeHubProcessingSubscription, Invariant($"Client {identity.Id} connected to edgeHub, processing existing subscriptions."));
             }
 
-            public static void SkippingProcessingSubscription(string id)
-            {
-                Log.LogInformation((int)EventIds.SkippingProcessingSubscription, Invariant($"Skipping {id} for subscription processing, as it is currently being processed."));
-            }
-
             public static void ProcessingSubscriptions(string id)
             {
                 Log.LogInformation((int)EventIds.ProcessingSubscription, Invariant($"Processing pending subscriptions for {id}"));
@@ -354,7 +347,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
 
             public static void ProcessingSubscriptionsNoCloudProxy(string id)
             {
-                Log.LogInformation((int)EventIds.ProcessingSubscriptionsNoCloudProxy, Invariant($"Processing pending subscriptions for {id}, but no cloud proxy was found"));
+                Log.LogInformation((int)EventIds.ProcessingSubscriptionsNoCloudProxy, Invariant($"Processing subscriptions for {id}, but no cloud proxy was found"));
             }
         }
 
