@@ -130,7 +130,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Mqtt
             this.mqttConnectionProvider.Dispose();
         }
 
-        ServerBootstrap SetupServerBootstrap()
+        internal ServerBootstrap SetupServerBootstrap()
         {
             int maxInboundMessageSize = this.settingsProvider.GetIntegerSetting("MaxInboundMessageSize", DefaultMaxInboundMessageSize);
             int threadCount = this.settingsProvider.GetIntegerSetting("ThreadCount", this.defaultThreadCount);
