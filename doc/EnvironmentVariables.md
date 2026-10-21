@@ -115,12 +115,18 @@ authentication chain. This uses the same response, without an additional device
 lookup or a refresh interval change. Existing parents are left to device and bulk
 refreshes to update.
 
-A missing parent is not inferred: if the response omits it and it is not already
-cached, the module can still lack an authentication chain. A later bulk refresh
-can still remove identities omitted from its response. The parent existence
-check and insertion are not atomic, so a concurrent parent update can still be
-overwritten. A stale module response can also reinsert a previously removed
-parent. This is a partial mitigation, not a guarantee against stale responses.
+If a successful module lookup omits its parent and the parent is not already
+cached, Edge Hub attempts an individual parent refresh using the same
+on-behalf-of device and the existing identity-refresh cooldown. The parent is
+not inferred, and existing missing/disabled-parent authentication-chain
+handling is unchanged. This does not retrieve missing intermediate ancestors
+in a nested hierarchy.
+
+A later bulk refresh can still remove identities omitted from its response.
+The parent existence check and insertion are not atomic, so a concurrent parent
+update can still be overwritten. A stale module response can also reinsert a
+previously removed parent. This is a partial mitigation, not a guarantee against
+stale responses.
 
 ### <a id="cloudauthnote">Cloud AuthenticationMode not supported in production</a>
 

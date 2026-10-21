@@ -318,6 +318,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                             await this.HandleNewServiceIdentity(p);
                         }
                     });
+
+                if (identity.HasValue && !parent.HasValue && !await this.serviceIdentityHierarchy.Contains(parts[0]))
+                {
+                    await this.RefreshServiceIdentityInternal(parts[0], onBehalfOfDevice, false);
+                }
+
                 return identity;
             }
             else

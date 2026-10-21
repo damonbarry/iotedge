@@ -1376,9 +1376,10 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
         }
 
         [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task RefreshModuleAfterEmptyScopePreservesParentAsync(bool includeParent)
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        public async Task RefreshModuleAfterEmptyScopePreservesParentAsync(bool includeParent, bool lookupParent)
         {
             var authentication = new ServiceAuthentication(new SymmetricKeyAuthentication(GetKey(), GetKey()));
             var parent = new ServiceIdentity("edge", null, "scope", Enumerable.Empty<string>(), "1234", new[] { Constants.IotEdgeIdentityCapability }, authentication, ServiceIdentityStatus.Enabled);
@@ -1393,6 +1394,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(iterator.Object);
             proxy.Setup(p => p.GetServiceIdentity("edge", "m1", "edge"))
                 .ReturnsAsync((Option.Some(module), includeParent ? Option.Some(parent) : Option.None<ServiceIdentity>()));
+            proxy.Setup(p => p.GetServiceIdentity("edge", "edge"))
+                .ReturnsAsync(lookupParent ? Option.Some(parent) : Option.None<ServiceIdentity>());
             DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(tree, proxy.Object, store, TimeSpan.FromHours(1), TimeSpan.FromMinutes(2));
             await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
             Assert.Empty(await cache.GetAllIds());
@@ -1401,7 +1404,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
 
             Assert.Equal(module, (await cache.GetServiceIdentity(module.Id)).OrDefault());
             Assert.True((await store.Get(module.Id)).HasValue);
-            if (includeParent)
+            if (includeParent || lookupParent)
             {
                 Assert.Equal(parent, (await cache.GetServiceIdentity(parent.Id)).OrDefault());
                 Assert.True((await store.Get(parent.Id)).HasValue);
@@ -1420,6 +1423,73 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             proxy.Verify(p => p.GetServiceIdentity("edge", "m1", "edge"), Times.Once);
             proxy.Verify(p => p.GetServiceIdentitiesIterator(), Times.Once);
             iterator.VerifyGet(i => i.HasNext, Times.AtLeastOnce);
+            proxy.Verify(p => p.GetServiceIdentity("edge", "edge"), includeParent ? Times.Never() : Times.Once());
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task RefreshModuleWithUnavailableParentDoesNotCreateAuthChainAsync(bool lookupFails)
+        {
+            var authentication = new ServiceAuthentication(new SymmetricKeyAuthentication(GetKey(), GetKey()));
+            var parent = new ServiceIdentity("edge", null, "scope", Enumerable.Empty<string>(), "1234", new[] { Constants.IotEdgeIdentityCapability }, authentication, ServiceIdentityStatus.Disabled);
+            var module = new ServiceIdentity("edge", "m1", null, Enumerable.Empty<string>(), "2345", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Enabled);
+            var iterator = new Mock<IServiceIdentitiesIterator>();
+            iterator.Setup(i => i.HasNext).Returns(false);
+            var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
+            proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(iterator.Object);
+            proxy.Setup(p => p.GetServiceIdentity("edge", "m1", "edge"))
+                .ReturnsAsync((Option.Some(module), Option.None<ServiceIdentity>()));
+            if (lookupFails)
+            {
+                proxy.Setup(p => p.GetServiceIdentity("edge", "edge"))
+                    .ThrowsAsync(new DeviceInvalidStateException("Device not in scope."));
+            }
+            else
+            {
+                proxy.Setup(p => p.GetServiceIdentity("edge", "edge")).ReturnsAsync(Option.Some(parent));
+            }
+
+            var store = GetEntityStore("cache");
+            DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(new ServiceIdentityTree("edge"), proxy.Object, store, TimeSpan.FromHours(1), TimeSpan.FromMinutes(2));
+            await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
+
+            await cache.RefreshServiceIdentity(module.Id);
+            await cache.RefreshServiceIdentity(module.Id);
+
+            Assert.Equal(module, (await cache.GetServiceIdentity(module.Id)).OrDefault());
+            Assert.Equal(!lookupFails, (await cache.GetServiceIdentity(parent.Id)).HasValue);
+            Assert.Equal(!lookupFails, (await store.Get(parent.Id)).HasValue);
+            Assert.False((await cache.GetAuthChain(module.Id)).HasValue);
+            if (lookupFails)
+            {
+                await Assert.ThrowsAsync<DeviceInvalidStateException>(() => cache.VerifyServiceIdentityAuthChainState(module.Id, true, true));
+            }
+            else
+            {
+                Assert.Equal(parent, (await cache.GetServiceIdentity(parent.Id)).OrDefault());
+            }
+
+            proxy.Verify(p => p.GetServiceIdentity("edge", "m1", "edge"), Times.Once);
+            proxy.Verify(p => p.GetServiceIdentity("edge", "edge"), Times.Once);
+        }
+
+        [Fact]
+        public async Task RefreshMissingModuleDoesNotFetchParentAsync()
+        {
+            var iterator = new Mock<IServiceIdentitiesIterator>();
+            iterator.Setup(i => i.HasNext).Returns(false);
+            var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
+            proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(iterator.Object);
+            proxy.Setup(p => p.GetServiceIdentity("edge", "m1", "edge"))
+                .ReturnsAsync((Option.None<ServiceIdentity>(), Option.None<ServiceIdentity>()));
+            DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(new ServiceIdentityTree("edge"), proxy.Object, GetEntityStore("cache"), TimeSpan.FromHours(1), TimeSpan.FromMinutes(2));
+            await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
+
+            await cache.RefreshServiceIdentity("edge/m1");
+
+            Assert.Empty(await cache.GetAllIds());
+            proxy.Verify(p => p.GetServiceIdentity("edge", "m1", "edge"), Times.Once);
             proxy.Verify(p => p.GetServiceIdentity(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
@@ -1481,8 +1551,10 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             proxy.Verify(p => p.GetServiceIdentity("edge", "edge"), Times.Once);
         }
 
-        [Fact]
-        public async Task RefreshModuleKeepsCachedNonEdgeParentAttachedAsync()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task RefreshModuleKeepsCachedNonEdgeParentAttachedAsync(bool includeParent)
         {
             var authentication = new ServiceAuthentication(new SymmetricKeyAuthentication(GetKey(), GetKey()));
             var edge = new ServiceIdentity("edge", null, "edgeScope", Enumerable.Empty<string>(), "1234", new[] { Constants.IotEdgeIdentityCapability }, authentication, ServiceIdentityStatus.Enabled);
@@ -1494,7 +1566,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             iterator.Setup(i => i.GetNext()).ReturnsAsync(new[] { edge, device, module });
             var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
             proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(iterator.Object);
-            proxy.Setup(p => p.GetServiceIdentity("d1", "m1", "edge")).ReturnsAsync((Option.Some(module), Option.Some(returnedDevice)));
+            proxy.Setup(p => p.GetServiceIdentity("d1", "m1", "edge"))
+                .ReturnsAsync((Option.Some(module), includeParent ? Option.Some(returnedDevice) : Option.None<ServiceIdentity>()));
             var store = GetEntityStore("cache");
             DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(new ServiceIdentityTree("edge"), proxy.Object, store, TimeSpan.FromHours(1), TimeSpan.FromMinutes(2));
             await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
