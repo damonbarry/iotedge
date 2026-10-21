@@ -15,7 +15,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
     using Newtonsoft.Json;
     using Nito.AsyncEx;
 
-    public sealed class DeviceScopeIdentitiesCache : IDeviceScopeIdentitiesCache
+    public sealed class DeviceScopeIdentitiesCache : IDeviceScopeIdentitiesCache, IDisposable
     {
         static readonly TimeSpan defaultInitializationRefreshDelay = TimeSpan.FromSeconds(60);
 
@@ -31,6 +31,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
         readonly AsyncManualResetEvent refreshCacheCompleteSignal = new AsyncManualResetEvent(false);
         readonly object refreshCacheLock = new object();
         readonly AtomicBoolean isInitialized = new AtomicBoolean(false);
+        readonly CancellationTokenSource refreshCacheCancellation = new CancellationTokenSource();
 
         Task refreshCacheTask;
         DateTime cacheLastRefreshTime;
@@ -294,9 +295,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
 
         public void Dispose()
         {
-            this.store?.Dispose();
-            this.refreshCacheTimer?.Dispose();
-            this.refreshCacheTask?.Dispose();
+            lock (this.refreshCacheLock)
+            {
+                if (!this.refreshCacheCancellation.IsCancellationRequested)
+                {
+                    this.refreshCacheCancellation.Cancel();
+                    this.refreshCacheTimer?.Dispose();
+                    this.store?.Dispose();
+                    this.refreshCacheCancellation.Dispose();
+                }
+            }
         }
 
         internal async Task<Option<ServiceIdentity>> GetServiceIdentityFromService(string targetId, string onBehalfOfDevice)
@@ -353,7 +361,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
         {
             lock (this.refreshCacheLock)
             {
-                if (this.refreshCacheTask == null || this.refreshCacheTask.IsCompleted)
+                if (!this.refreshCacheCancellation.IsCancellationRequested && (this.refreshCacheTask == null || this.refreshCacheTask.IsCompleted))
                 {
                     Events.InitializingRefreshTask(this.periodicRefreshRate);
                     this.refreshCacheTask = this.RefreshCache();
@@ -363,17 +371,37 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
 
         async Task RefreshCache()
         {
-            while (true)
+            CancellationToken cancellationToken = this.refreshCacheCancellation.Token;
+            TimeSpan emptyScopeRefreshDelay = TimeSpan.Zero;
+            while (!cancellationToken.IsCancellationRequested)
             {
-                bool succeeded = await this.RefreshCacheInternal();
+                (bool succeeded, bool empty) = await this.RefreshCacheInternal(cancellationToken);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
                 if (this.ShouldRetryRefreshCache(succeeded))
                 {
                     Events.RetryRefreshCycle(this.initializationRefreshDelay);
-                    await this.IsReady(this.initializationRefreshDelay);
+                    await this.IsReady(this.initializationRefreshDelay, cancellationToken);
                 }
                 else
                 {
-                    Events.DoneRefreshCycle(this.periodicRefreshRate);
+                    // An empty query can be a stale view, not proof that discovery is complete.
+                    // Keep reconciling normally, but retry without waiting for another client.
+                    if (succeeded ? empty : emptyScopeRefreshDelay > TimeSpan.Zero)
+                    {
+                        emptyScopeRefreshDelay = this.GetNextEmptyScopeRefreshDelay(emptyScopeRefreshDelay);
+                        Events.EmptyScopeRecovery(emptyScopeRefreshDelay);
+                    }
+                    else
+                    {
+                        emptyScopeRefreshDelay = TimeSpan.Zero;
+                    }
+
+                    TimeSpan nextRefreshDelay = emptyScopeRefreshDelay != TimeSpan.Zero ? emptyScopeRefreshDelay : this.periodicRefreshRate;
+                    Events.DoneRefreshCycle(nextRefreshDelay);
                     this.isInitialized.Set(true);
                     this.ServiceIdentitiesUpdated?.Invoke(this, await this.serviceIdentityHierarchy.GetAllIds());
 
@@ -389,14 +417,37 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                         this.refreshCacheSignal.Reset();
                     }
 
-                    await this.IsReady(this.periodicRefreshRate);
+                    await this.IsReady(nextRefreshDelay, cancellationToken);
                 }
             }
         }
 
         bool ShouldRetryRefreshCache(bool lastRefreshSucceeded) => !lastRefreshSucceeded && !this.isInitialized.Get();
 
-        async Task<bool> RefreshCacheInternal()
+        TimeSpan GetNextEmptyScopeRefreshDelay(TimeSpan previousDelay)
+        {
+            if (this.periodicRefreshRate <= TimeSpan.Zero)
+            {
+                return this.periodicRefreshRate;
+            }
+
+            TimeSpan initialDelay = this.initializationRefreshDelay > this.refreshDelay ? this.initializationRefreshDelay : this.refreshDelay;
+            if (initialDelay <= TimeSpan.Zero)
+            {
+                initialDelay = defaultInitializationRefreshDelay;
+            }
+
+            if (previousDelay == TimeSpan.Zero)
+            {
+                return initialDelay < this.periodicRefreshRate ? initialDelay : this.periodicRefreshRate;
+            }
+
+            return previousDelay.Ticks >= this.periodicRefreshRate.Ticks / 2
+                ? this.periodicRefreshRate
+                : previousDelay + previousDelay;
+        }
+
+        async Task<(bool Succeeded, bool Empty)> RefreshCacheInternal(CancellationToken cancellationToken)
         {
             try
             {
@@ -405,9 +456,11 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                 IServiceIdentitiesIterator iterator = this.serviceProxy.GetServiceIdentitiesIterator();
                 while (iterator.HasNext)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     IEnumerable<ServiceIdentity> batch = await iterator.GetNext();
                     foreach (ServiceIdentity serviceIdentity in batch)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         try
                         {
                             await this.HandleNewServiceIdentity(serviceIdentity);
@@ -421,31 +474,44 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                 }
 
                 // Diff and update
+                cancellationToken.ThrowIfCancellationRequested();
                 IList<string> allIds = await this.serviceIdentityHierarchy.GetAllIds();
+                cancellationToken.ThrowIfCancellationRequested();
                 IList<string> removedIds = allIds.Except(currentCacheIds).ToList();
                 await Task.WhenAll(removedIds.Select(id => this.HandleNoServiceIdentity(id)));
 
-                return true;
+                return (true, currentCacheIds.Count == 0);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return (false, false);
             }
             catch (Exception e)
             {
                 Events.ErrorInRefreshCycle(e);
-                return false;
+                return (false, false);
             }
         }
 
-        async Task IsReady(TimeSpan delay)
+        async Task IsReady(TimeSpan delay, CancellationToken cancellationToken)
         {
-            Task refreshCacheSignalTask = this.refreshCacheSignal.WaitAsync();
-            Task sleepTask = Task.Delay(delay);
-            Task task = await Task.WhenAny(refreshCacheSignalTask, sleepTask);
-            if (task == refreshCacheSignalTask)
+            using (var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
-                Events.RefreshSignalled();
-            }
-            else
-            {
-                Events.RefreshSleepCompleted();
+                Task refreshCacheSignalTask = this.refreshCacheSignal.WaitAsync(waitCancellation.Token);
+                Task sleepTask = Task.Delay(delay, waitCancellation.Token);
+                Task task = await Task.WhenAny(refreshCacheSignalTask, sleepTask);
+                waitCancellation.Cancel();
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    if (task == refreshCacheSignalTask)
+                    {
+                        Events.RefreshSignalled();
+                    }
+                    else
+                    {
+                        Events.RefreshSleepCompleted();
+                    }
+                }
             }
         }
 
@@ -617,6 +683,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
                 GettingServiceIdentity,
                 VerifyServiceIdentity,
                 RetryCycle,
+                EmptyScopeRecovery,
             }
 
             public static void Created() =>
@@ -633,6 +700,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core
 
             public static void RetryRefreshCycle(TimeSpan refreshRate) =>
                Log.LogInformation((int)EventIds.RetryCycle, $"Retry refreshing device scope identities cache. Waiting for {refreshRate.TotalSeconds} seconds.");
+
+            public static void EmptyScopeRecovery(TimeSpan refreshRate) =>
+                Log.LogInformation((int)EventIds.EmptyScopeRecovery, $"Device scope cache is recovering from an empty scope response. Next refresh in {refreshRate.TotalSeconds} seconds.");
 
             public static void DoneRefreshCycle(TimeSpan refreshRate) =>
                 Log.LogInformation((int)EventIds.DoneCycle, $"Done refreshing device scope identities cache. Waiting for {refreshRate.TotalMinutes} minutes.");

@@ -122,6 +122,30 @@ check and insertion are not atomic, so a concurrent parent update can still be
 overwritten. A stale module response can also reinsert a previously removed
 parent. This is a partial mitigation, not a guarantee against stale responses.
 
+### Recovery after an empty device scope response
+
+A successful scope refresh that returns no identities still removes omitted
+identities and completes initialization, so individual identity lookups remain
+available. Edge Hub also schedules another scope refresh without requiring a
+client reconnect or an explicit refresh request. The first retry waits for the
+larger of the initialization retry delay (60 seconds) and
+`DeviceScopeCacheRefreshDelaySecs` (120 seconds by default), capped at
+`DeviceScopeCacheRefreshRateSecs` (3600 seconds by default). If both retry delays
+are zero, the initialization default is used instead to avoid a tight retry loop.
+
+Consecutive empty results double this delay up to the normal refresh interval.
+Transient refresh errors during this recovery also continue the backoff. A
+successful nonempty result restores the normal refresh interval and resets the
+backoff. Explicit refresh requests continue to use the existing cooldown.
+
+This does not preserve identities omitted by the service, infer missing parents,
+or bypass scope authorization. It can recover modules, leaf devices, and nested
+hierarchies once a later scope query returns the required identities, but it
+still depends on that query becoming consistent. Nonempty-but-incomplete results
+do not trigger this recovery. Additional scope queries consume IoT Hub quotas;
+even a legitimately empty scope follows the same backoff. The default retry
+delays are 2, 4, 8, 16, 32, then 60 minutes between completed refreshes.
+
 ### <a id="cloudauthnote">Cloud AuthenticationMode not supported in production</a>
 
 Cloud authentication is not supported in production because of several known limitations:

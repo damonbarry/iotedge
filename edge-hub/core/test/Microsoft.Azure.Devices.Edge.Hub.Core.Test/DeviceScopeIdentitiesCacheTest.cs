@@ -2,9 +2,12 @@
 namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Hub.Core.Identity.Service;
     using Microsoft.Azure.Devices.Edge.Storage;
@@ -1508,6 +1511,166 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Test
             Assert.Equal("d1/m1;d1;edge", (await cache.GetAuthChain(module.Id)).OrDefault());
             proxy.Verify(p => p.GetServiceIdentity("d1", "m1", "edge"), Times.Once);
             proxy.Verify(p => p.GetServiceIdentity(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task EmptyScopeAutomaticallyRecoversIdentitiesAsync(bool nested, bool persisted)
+        {
+            var authentication = new ServiceAuthentication(new SymmetricKeyAuthentication(GetKey(), GetKey()));
+            var edge = new ServiceIdentity("edge", null, "edgeScope", Enumerable.Empty<string>(), "1234", new[] { Constants.IotEdgeIdentityCapability }, authentication, ServiceIdentityStatus.Enabled);
+            var child = new ServiceIdentity("child", null, "childScope", new[] { "edgeScope" }, "2345", new[] { Constants.IotEdgeIdentityCapability }, authentication, ServiceIdentityStatus.Enabled);
+            var ownModule = new ServiceIdentity("edge", "m1", null, Enumerable.Empty<string>(), "3456", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Enabled);
+            var childModule = new ServiceIdentity("child", "m1", null, Enumerable.Empty<string>(), "4567", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Enabled);
+            var leaf = new ServiceIdentity("leaf", null, null, new[] { nested ? "childScope" : "edgeScope" }, "5678", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Enabled);
+            var disabled = new ServiceIdentity("disabled", null, null, new[] { "edgeScope" }, "6789", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Disabled);
+            var removed = new ServiceIdentity("removed", null, null, new[] { "edgeScope" }, "7890", Enumerable.Empty<string>(), authentication, ServiceIdentityStatus.Enabled);
+            var store = GetEntityStore("cache");
+            if (persisted)
+            {
+                await store.Put(edge.Id, new DeviceScopeIdentitiesCache.StoredServiceIdentity(edge).ToJson());
+                await store.Put(removed.Id, new DeviceScopeIdentitiesCache.StoredServiceIdentity(removed).ToJson());
+            }
+
+            var firstResponse = new TaskCompletionSource<IEnumerable<ServiceIdentity>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var empty = new Mock<IServiceIdentitiesIterator>(MockBehavior.Strict);
+            empty.SetupSequence(i => i.HasNext).Returns(true).Returns(false);
+            empty.Setup(i => i.GetNext()).Returns(firstResponse.Task);
+            var populated = new Mock<IServiceIdentitiesIterator>(MockBehavior.Strict);
+            populated.SetupSequence(i => i.HasNext).Returns(true).Returns(false);
+            populated.Setup(i => i.GetNext()).ReturnsAsync(new[] { edge, child, ownModule, childModule, leaf, disabled });
+            var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
+            proxy.SetupSequence(p => p.GetServiceIdentitiesIterator()).Returns(empty.Object).Returns(populated.Object);
+            proxy.Setup(p => p.GetServiceIdentity("edge", "m1", "edge"))
+                .ReturnsAsync((Option.Some(ownModule), Option.None<ServiceIdentity>()));
+            IServiceIdentityHierarchy hierarchy = nested ? new ServiceIdentityTree("edge") : new ServiceIdentityDictionary("edge");
+            using DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(hierarchy, proxy.Object, store, TimeSpan.FromHours(1), TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1));
+            var recovered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            cache.ServiceIdentitiesUpdated += (_, ids) =>
+            {
+                if (ids.Contains(leaf.Id))
+                {
+                    recovered.TrySetResult(true);
+                }
+            };
+            firstResponse.SetResult(Array.Empty<ServiceIdentity>());
+            await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
+
+            Assert.Empty(await cache.GetAllIds());
+            Assert.False((await store.Get(removed.Id)).HasValue);
+            await cache.RefreshServiceIdentity(ownModule.Id);
+            Assert.Equal(ownModule, (await cache.GetServiceIdentity(ownModule.Id)).OrDefault());
+            if (nested)
+            {
+                Assert.False((await cache.GetAuthChain(ownModule.Id)).HasValue);
+            }
+
+            // Only the background refresh can provide the missing hierarchy.
+            await recovered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.Equal("edge/m1;edge", (await cache.GetAuthChain(ownModule.Id)).OrDefault());
+            Assert.Equal(nested ? "child/m1;child;edge" : "child/m1;edge", (await cache.GetAuthChain(childModule.Id)).OrDefault());
+            Assert.Equal(nested ? "leaf;child;edge" : "leaf;edge", (await cache.GetAuthChain(leaf.Id)).OrDefault());
+            Assert.Equal(leaf, (await cache.GetServiceIdentity(leaf.Id)).OrDefault());
+            Assert.True((await store.Get(leaf.Id)).HasValue);
+            Assert.False((await cache.GetServiceIdentity(removed.Id)).HasValue);
+            await Assert.ThrowsAsync<DeviceInvalidStateException>(() => cache.VerifyServiceIdentityAuthChainState(removed.Id, nested, false));
+            await Assert.ThrowsAsync<DeviceInvalidStateException>(() => cache.VerifyServiceIdentityAuthChainState(disabled.Id, nested, false));
+            proxy.Verify(p => p.GetServiceIdentitiesIterator(), Times.Exactly(2));
+            proxy.Verify(p => p.GetServiceIdentity("edge", "m1", "edge"), Times.Once);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task EmptyScopeRecoveryBacksOffCapsAndResetsAsync(bool failDuringRecovery)
+        {
+            var identity = new ServiceIdentity("leaf", "1234", Enumerable.Empty<string>(), new ServiceAuthentication(ServiceAuthenticationType.None), ServiceIdentityStatus.Enabled);
+            var firstResponse = new TaskCompletionSource<IEnumerable<ServiceIdentity>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var requestTimes = new ConcurrentQueue<TimeSpan>();
+            var stopwatch = Stopwatch.StartNew();
+            int requests = 0;
+            var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
+            proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(() =>
+            {
+                int request = Interlocked.Increment(ref requests);
+                requestTimes.Enqueue(stopwatch.Elapsed);
+                var iterator = new Mock<IServiceIdentitiesIterator>(MockBehavior.Strict);
+                iterator.SetupSequence(i => i.HasNext).Returns(true).Returns(false);
+                if (request == 1)
+                {
+                    iterator.Setup(i => i.GetNext()).Returns(firstResponse.Task);
+                }
+                else if (request == 3 && failDuringRecovery)
+                {
+                    iterator.Setup(i => i.GetNext()).ThrowsAsync(new TimeoutException("Temporary scope service failure"));
+                }
+                else
+                {
+                    iterator.Setup(i => i.GetNext()).ReturnsAsync(request == 4 || request == 6 ? new[] { identity } : Array.Empty<ServiceIdentity>());
+                }
+
+                return iterator.Object;
+            });
+            using DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(
+                new ServiceIdentityTree("edge"), proxy.Object, GetEntityStore("cache"), TimeSpan.FromMilliseconds(600), TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(100));
+            var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            cache.ServiceIdentitiesUpdated += (_, ids) =>
+            {
+                if (Volatile.Read(ref requests) == 6 && ids.Contains(identity.Id))
+                {
+                    completed.TrySetResult(true);
+                }
+            };
+            firstResponse.SetResult(Array.Empty<ServiceIdentity>());
+
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cache.Dispose();
+
+            TimeSpan[] times = requestTimes.ToArray();
+            Assert.Equal(6, times.Length);
+            int[] expectedDelaysMs = { 200, 400, 600, 600, 200 };
+            for (int i = 0; i < expectedDelaysMs.Length; ++i)
+            {
+                Assert.InRange((times[i + 1] - times[i]).TotalMilliseconds, expectedDelaysMs[i] - 5, expectedDelaysMs[i] + 150);
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task EmptyScopeRecoveryStopsAfterDisposalAsync(bool refreshInProgress)
+        {
+            var identity = new ServiceIdentity("leaf", "1234", Enumerable.Empty<string>(), new ServiceAuthentication(ServiceAuthenticationType.None), ServiceIdentityStatus.Enabled);
+            var requested = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var response = new TaskCompletionSource<IEnumerable<ServiceIdentity>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var iterator = new Mock<IServiceIdentitiesIterator>(MockBehavior.Strict);
+            iterator.SetupSequence(i => i.HasNext).Returns(true).Returns(false);
+            iterator.Setup(i => i.GetNext()).Callback(() => requested.TrySetResult(true)).Returns(response.Task);
+            var proxy = new Mock<IServiceProxy>(MockBehavior.Strict);
+            proxy.Setup(p => p.GetServiceIdentitiesIterator()).Returns(iterator.Object);
+            using DeviceScopeIdentitiesCache cache = await DeviceScopeIdentitiesCache.Create(
+                new ServiceIdentityTree("edge"), proxy.Object, GetEntityStore("cache"), TimeSpan.FromHours(1), TimeSpan.Zero, TimeSpan.FromMilliseconds(50));
+            await requested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            if (!refreshInProgress)
+            {
+                response.SetResult(Array.Empty<ServiceIdentity>());
+                await cache.WaitForCacheRefresh(TimeSpan.FromSeconds(10));
+            }
+
+            cache.Dispose();
+            if (refreshInProgress)
+            {
+                response.SetResult(new[] { identity });
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+            Assert.Empty(await cache.GetAllIds());
+            proxy.Verify(p => p.GetServiceIdentitiesIterator(), Times.Once);
         }
 
         static string GetKey() => Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()));
