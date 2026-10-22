@@ -5,6 +5,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
+    using System.Net;
+    using System.Net.Http;
     using System.Net.Sockets;
     using System.Runtime.ExceptionServices;
     using System.Threading;
@@ -209,7 +211,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core
                     }
                 }
 
-                if (await this.IsServiceAvailableViaTcpAsync())
+                if (await this.IsServiceAvailableAsync(token))
                 {
                     await this.reporter.ReportAsync(token, moduleSetToReport, await this.environment.GetRuntimeInfoAsync(), this.currentConfig.Version, this.status);
                 }
@@ -218,19 +220,40 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core
             }
         }
 
-        async Task<bool> IsServiceAvailableViaTcpAsync()
+        async Task<bool> IsServiceAvailableAsync(CancellationToken token)
         {
             return await this.offlineCheckInfo.Match<Task<bool>>(
                 async (info) =>
                 {
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(10));
                     try
                     {
+                        var address = new UriBuilder(Uri.UriSchemeHttp, info.Address, info.Port).Uri;
+                        IWebProxy proxy = info.Proxy.OrDefault();
+                        if (proxy != null && !proxy.IsBypassed(address))
+                        {
+                            using var handler = new HttpClientHandler { Proxy = proxy, AllowAutoRedirect = false };
+                            using var client = new HttpClient(handler);
+                            using var request = new HttpRequestMessage(HttpMethod.Connect, address);
+                            request.Headers.Host = address.Authority;
+                            // Establish a tunnel to the target, not just a connection to the proxy.
+                            using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                            if (response.StatusCode != HttpStatusCode.OK)
+                            {
+                                throw new HttpRequestException($"Offline check proxy tunnel failed with status {(int)response.StatusCode}.");
+                            }
+
+                            return true;
+                        }
+
                         using var tcpClient = new TcpClient();
-                        await tcpClient.ConnectAsync(info.Address, info.Port);
+                        await tcpClient.ConnectAsync(info.Address, info.Port, timeout.Token);
                         return true;
                     }
-                    catch (Exception)
+                    catch (Exception ex) when (!ex.IsFatal() && !token.IsCancellationRequested)
                     {
+                        Events.OfflineCheckFailed(ex);
                         return false;
                     }
                 },
@@ -388,7 +411,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core
                 InitiatingStopModules,
                 StopModulesFailed,
                 FinishedReconcile,
-                StartingReconcile
+                StartingReconcile,
+                OfflineCheckFailed
             }
 
             public static void AgentCreated()
@@ -487,6 +511,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core
             public static void StartingReconcile()
             {
                 Log.LogDebug((int)EventIds.StartingReconcile, "Starting reconcile operation");
+            }
+
+            public static void OfflineCheckFailed(Exception ex)
+            {
+                Log.LogDebug((int)EventIds.OfflineCheckFailed, ex, "Offline connectivity check failed; skipping status report.");
             }
         }
     }

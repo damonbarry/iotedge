@@ -200,7 +200,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
                     };
 
                     var address = configuration.GetValue<string>(Constants.IotHubHostnameVariableName);
-                    offlineCheckInfo = Option.Some(new OfflineCheckInfo(address, port));
+                    offlineCheckInfo = Option.Some(new OfflineCheckInfo(address, port, proxy));
                 }
 
                 switch (mode.ToLowerInvariant())

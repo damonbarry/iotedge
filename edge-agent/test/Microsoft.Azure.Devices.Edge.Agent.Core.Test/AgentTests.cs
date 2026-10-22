@@ -4,6 +4,10 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Test
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.IO;
+    using System.Net;
+    using System.Net.Sockets;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources;
@@ -144,6 +148,108 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Test
             mockPlanner.Verify(pl => pl.PlanAsync(It.Is<ModuleSet>(ms => ms.Equals(desiredModuleSet)), currentModuleSet, runtimeInfo, ImmutableDictionary<string, IModuleIdentity>.Empty), Times.Once);
             mockReporter.Verify(r => r.ReportAsync(token, currentModuleSet, runtimeInfo, deploymentConfigInfo.Version, DeploymentStatus.Success), Times.Once);
             mockPlanRunner.Verify(r => r.ExecuteAsync(1, Plan.Empty, token), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(false, "200 Connection Established", true)]
+        [InlineData(true, "200 Connection Established", true)]
+        [InlineData(false, "407 Proxy Authentication Required", false)]
+        [InlineData(false, "502 Bad Gateway", false)]
+        [InlineData(false, "302 Found", false)]
+        public async Task ReconcileAsyncChecksTargetThroughProxy(bool authenticate, string status, bool available)
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var proxy = new WebProxy(new Uri($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}"));
+            if (authenticate)
+            {
+                proxy.Credentials = new NetworkCredential("test-user", "test-password");
+            }
+
+            var offlineCheckInfo = new OfflineCheckInfo("iot-hub.invalid", 443, Option.Some<IWebProxy>(proxy));
+            var reporter = new Mock<IReporter>();
+            Agent agent = CreateAgentForOfflineCheck(Option.Some(offlineCheckInfo), reporter);
+            Task proxyTask = RespondToProxyConnectAsync(listener, authenticate, status, cancellation.Token);
+            try
+            {
+                await agent.ReconcileAsync(cancellation.Token).WaitAsync(cancellation.Token);
+
+                reporter.Verify(r => r.ReportAsync(It.IsAny<CancellationToken>(), It.IsAny<ModuleSet>(), It.IsAny<IRuntimeInfo>(), It.IsAny<long>(), It.IsAny<DeploymentStatus>()), Times.Exactly(available ? 1 : 0));
+                await proxyTask;
+            }
+            finally
+            {
+                cancellation.Cancel();
+                try
+                {
+                    await proxyTask;
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                {
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        [InlineData(false, false)]
+        public async Task ReconcileAsyncChecksDirectRoute(bool available, bool bypassProxy)
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            if (!available)
+            {
+                listener.Stop();
+            }
+
+            Option<IWebProxy> proxy = bypassProxy
+                ? Option.Some<IWebProxy>(new WebProxy("http://proxy.invalid:3128") { BypassList = new[] { @"127\.0\.0\.1" } })
+                : Option.None<IWebProxy>();
+            var reporter = new Mock<IReporter>();
+            Agent agent = CreateAgentForOfflineCheck(Option.Some(new OfflineCheckInfo("127.0.0.1", port, proxy)), reporter);
+
+            await agent.ReconcileAsync(cancellation.Token).WaitAsync(cancellation.Token);
+
+            reporter.Verify(r => r.ReportAsync(It.IsAny<CancellationToken>(), It.IsAny<ModuleSet>(), It.IsAny<IRuntimeInfo>(), It.IsAny<long>(), It.IsAny<DeploymentStatus>()), Times.Exactly(available ? 1 : 0));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ReconcileAsyncRecoversAfterStalledProxy(bool cancelCaller)
+        {
+            using var cancellation = new CancellationTokenSource();
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var proxy = new WebProxy($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}");
+            var reporter = new Mock<IReporter>();
+            Agent agent = CreateAgentForOfflineCheck(Option.Some(new OfflineCheckInfo("iot-hub.invalid", 443, Option.Some<IWebProxy>(proxy))), reporter);
+
+            Task reconcile = agent.ReconcileAsync(cancellation.Token);
+            using var acceptTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using TcpClient stalledConnection = await listener.AcceptTcpClientAsync(acceptTimeout.Token);
+            if (cancelCaller)
+            {
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reconcile.WaitAsync(TimeSpan.FromSeconds(5)));
+            }
+            else
+            {
+                await reconcile.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+
+            reporter.Verify(r => r.ReportAsync(It.IsAny<CancellationToken>(), It.IsAny<ModuleSet>(), It.IsAny<IRuntimeInfo>(), It.IsAny<long>(), It.IsAny<DeploymentStatus>()), Times.Never);
+
+            using var recoveryTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(
+                agent.ReconcileAsync(recoveryTimeout.Token),
+                RespondToProxyConnectAsync(listener, false, "200 Connection Established", recoveryTimeout.Token)).WaitAsync(recoveryTimeout.Token);
+
+            reporter.Verify(r => r.ReportAsync(It.IsAny<CancellationToken>(), It.IsAny<ModuleSet>(), It.IsAny<IRuntimeInfo>(), It.IsAny<long>(), It.IsAny<DeploymentStatus>()), Times.Once);
         }
 
         [Fact]
@@ -752,6 +858,68 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Test
             mockReporter.Verify(r => r.ReportShutdown(It.IsAny<DeploymentStatus>(), token), Times.Once);
             mockPlanRunner.Verify(r => r.ExecuteAsync(It.IsAny<long>(), It.IsAny<Plan>(), It.IsAny<CancellationToken>()), Times.Once);
             mockPlanner.Verify(r => r.CreateShutdownPlanAsync(It.IsAny<ModuleSet>()), Times.Once);
+        }
+
+        static Agent CreateAgentForOfflineCheck(Option<OfflineCheckInfo> offlineCheckInfo, Mock<IReporter> reporter)
+        {
+            var configSource = new Mock<IConfigSource>();
+            configSource.Setup(c => c.GetDeploymentConfigInfoAsync()).ReturnsAsync(DeploymentConfigInfo.Empty);
+            var environment = new Mock<IEnvironment>();
+            environment.Setup(e => e.GetModulesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(ModuleSet.Empty);
+            var environmentProvider = Mock.Of<IEnvironmentProvider>(p => p.Create(It.IsAny<DeploymentConfig>()) == environment.Object);
+            reporter.Setup(r => r.ReportAsync(It.IsAny<CancellationToken>(), It.IsAny<ModuleSet>(), It.IsAny<IRuntimeInfo>(), It.IsAny<long>(), It.IsAny<DeploymentStatus>())).Returns(Task.CompletedTask);
+
+            return new Agent(
+                configSource.Object,
+                environmentProvider,
+                Mock.Of<IPlanner>(),
+                Mock.Of<IPlanRunner>(),
+                reporter.Object,
+                Mock.Of<IModuleIdentityLifecycleManager>(),
+                Mock.Of<IEntityStore<string, string>>(),
+                DeploymentConfigInfo.Empty,
+                Mock.Of<ISerde<DeploymentConfigInfo>>(),
+                Mock.Of<IEncryptionProvider>(),
+                Mock.Of<IDeploymentMetrics>(),
+                offlineCheckInfo);
+        }
+
+        static async Task RespondToProxyConnectAsync(TcpListener listener, bool authenticate, string status, CancellationToken token)
+        {
+            for (int attempt = 0; attempt < (authenticate ? 2 : 1); attempt++)
+            {
+                using TcpClient client = await listener.AcceptTcpClientAsync(token);
+                using NetworkStream stream = client.GetStream();
+                using var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
+                Assert.Equal("CONNECT iot-hub.invalid:443 HTTP/1.1", await reader.ReadLineAsync(token));
+                string authorization = null;
+                string header;
+                while (!string.IsNullOrEmpty(header = await reader.ReadLineAsync(token)))
+                {
+                    if (header.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        authorization = header.Substring("Proxy-Authorization:".Length).Trim();
+                    }
+                }
+
+                string response;
+                if (authenticate && attempt == 0)
+                {
+                    Assert.Null(authorization);
+                    response = "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                }
+                else
+                {
+                    if (authenticate)
+                    {
+                        Assert.Equal($"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes("test-user:test-password"))}", authorization);
+                    }
+
+                    response = $"HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                }
+
+                await stream.WriteAsync(Encoding.ASCII.GetBytes(response), token);
+            }
         }
     }
 }
